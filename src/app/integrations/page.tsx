@@ -10,7 +10,7 @@ const groups = [
 export default function IntegrationsPage() {
   return (
     <main className="px-5 py-16 sm:px-8">
-      <SectionHeader eyebrow="Integrations" title="Integration status preview" description="All integrations are generic placeholders and clearly labeled by status. No unsupported claims are made." />
+      <SectionHeader eyebrow="Integrations" title="Integration status" description="Integration availability is clearly labeled by status so teams can separate available workflows from upcoming roadmap items." />
       <section className="mx-auto mt-10 grid max-w-7xl gap-6 md:grid-cols-3">
         {groups.map(([title, items, tone]) => (
           <ClayCard key={title}>

@@ -57,7 +57,7 @@ export function Footer() {
         </div>
       </div>
       <div className="border-t border-white/10 px-5 py-5 text-center text-xs leading-5 text-slate-400">
-        Phase 1 website preview. No payment, authentication, backend workflow, or real third-party integrations are connected.
+        AI search readiness guidance for teams improving citation clarity, answer coverage, and AEO/GEO gaps.
       </div>
     </footer>
   );

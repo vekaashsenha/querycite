@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { featureCards, faqs, integrations, mockReport, useCases } from "@/lib/mock";
+import { normalizeWebsiteUrl, urlErrorMessage } from "@/lib/url";
 import { ClayCard, LockedPanel, PrimaryLink, ScoreRing, SectionHeader, StatusPill } from "@/components/ui";
 
 const scanSteps = ["Scanning website", "Checking AI visibility signals", "Reviewing AEO/GEO gaps", "Preparing report"];
@@ -21,9 +22,9 @@ function ScanState({ progress }: { progress: number }) {
     <ClayCard className="border-violet-200 bg-violet-50/80">
       <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <StatusPill>Mock scan running</StatusPill>
+          <StatusPill>Scan in progress</StatusPill>
           <h2 className="mt-4 text-2xl font-semibold leading-tight text-slate-950">Preparing your AI Visibility Audit</h2>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600">This Phase 1 flow uses mock progress and mock report data. No real APIs are connected.</p>
+          <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600">Reviewing page structure, answer coverage, entity clarity, and report readiness.</p>
         </div>
         <div className="text-5xl font-semibold leading-none text-violet-700">{progress}%</div>
       </div>
@@ -48,10 +49,10 @@ function HeroPreview() {
       <ClayCard className="relative overflow-hidden bg-white/90 p-5">
         <div className="flex items-center justify-between gap-4 border-b border-slate-100 pb-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Audit preview</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Audit snapshot</p>
             <h2 className="mt-1 text-lg font-semibold text-slate-950">AI search readiness</h2>
           </div>
-          <StatusPill tone="green">Free preview</StatusPill>
+          <StatusPill tone="green">Free audit</StatusPill>
         </div>
         <div className="mt-5 grid gap-4 sm:grid-cols-3">
           <div className="rounded-2xl bg-violet-50 p-4"><p className="text-xs font-semibold text-violet-700">AI Visibility</p><p className="mt-3 text-3xl font-semibold text-slate-950">64</p></div>
@@ -84,17 +85,18 @@ function FeatureGlyph({ title }: { title: string }) {
     </div>
   );
 }
-function MockReportPreview({ url }: { url: string }) {
+
+function ReportPreview({ url }: { url: string }) {
   return (
     <section id="report-preview" className="mx-auto w-full max-w-7xl px-5 py-10 sm:px-8">
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Free report preview</p>
-          <h2 className="mt-2 text-3xl font-semibold leading-tight text-slate-950">AI Visibility Audit preview</h2>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Free report</p>
+          <h2 className="mt-2 text-3xl font-semibold leading-tight text-slate-950">AI Visibility Audit snapshot</h2>
           <p className="mt-2 text-sm text-slate-600">Website URL: {url || mockReport.websiteUrl}</p>
         </div>
         <Link href="/report" className="inline-flex min-h-11 items-center justify-center rounded-full border border-slate-300 bg-white px-5 text-sm font-semibold text-slate-900 transition hover:border-slate-950">
-          Open full mock report
+          Open full report preview
         </Link>
       </div>
 
@@ -130,7 +132,7 @@ function MockReportPreview({ url }: { url: string }) {
 
       <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {mockReport.lockedSections.slice(0, 4).map((section) => (
-          <LockedPanel key={section} title={section} description="Visible in the paid full report preview." />
+          <LockedPanel key={section} title={section} description="Available in the full report" />
         ))}
       </div>
     </section>
@@ -139,6 +141,7 @@ function MockReportPreview({ url }: { url: string }) {
 
 export function HomeExperience() {
   const [url, setUrl] = useState("");
+  const [urlError, setUrlError] = useState("");
   const [submittedUrl, setSubmittedUrl] = useState("");
   const [scanState, setScanState] = useState<"idle" | "scanning" | "complete">("idle");
   const [progress, setProgress] = useState(0);
@@ -160,9 +163,20 @@ export function HomeExperience() {
     return () => window.clearInterval(timer);
   }, [scanState]);
 
-  function runMockAudit(event: FormEvent<HTMLFormElement>) {
+  function runAudit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setSubmittedUrl(url);
+
+    const normalizedUrl = normalizeWebsiteUrl(url);
+    if (!normalizedUrl) {
+      setUrlError(urlErrorMessage);
+      setScanState("idle");
+      setSubmittedUrl("");
+      return;
+    }
+
+    setUrlError("");
+    setUrl(normalizedUrl);
+    setSubmittedUrl(normalizedUrl);
     setProgress(0);
     setScanState("scanning");
   }
@@ -186,18 +200,25 @@ export function HomeExperience() {
           <div className="grid gap-5">
             <ClayCard className="bg-white/90">
               <h2 className="text-2xl font-semibold leading-tight text-slate-950">Run a free AI visibility audit</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-600">Enter a website URL to preview the Phase 1 scan flow with mock data.</p>
-              <form onSubmit={runMockAudit} className="mt-6 grid gap-3">
+              <p className="mt-2 text-sm leading-6 text-slate-600">Enter your website to start the free audit flow.</p>
+              <form onSubmit={runAudit} className="mt-6 grid gap-3" noValidate>
                 <label htmlFor="audit-url" className="text-sm font-semibold text-slate-700">Website URL</label>
                 <input
                   id="audit-url"
-                  type="url"
+                  type="text"
+                  inputMode="url"
                   required
                   value={url}
-                  onChange={(event) => setUrl(event.target.value)}
-                  placeholder="https://yourbrand.com"
+                  onChange={(event) => {
+                    setUrl(event.target.value);
+                    if (urlError) setUrlError("");
+                  }}
+                  placeholder="Enter your website URL, for example byldgroup.com"
+                  aria-invalid={Boolean(urlError)}
+                  aria-describedby={urlError ? "audit-url-error" : undefined}
                   className="min-h-14 rounded-2xl border border-slate-200 bg-white px-5 text-base outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
                 />
+                {urlError ? <p id="audit-url-error" className="text-sm font-semibold leading-5 text-rose-600">{urlError}</p> : null}
                 <button type="submit" className="min-h-14 rounded-2xl bg-slate-950 px-6 text-sm font-semibold text-white shadow-lg shadow-slate-950/15 transition hover:-translate-y-0.5 hover:bg-slate-800">
                   Run Free AI Visibility Audit
                 </button>
@@ -215,7 +236,7 @@ export function HomeExperience() {
       </section>
 
       {scanState === "scanning" ? <section className="mx-auto w-full max-w-7xl px-5 py-10 sm:px-8"><ScanState progress={progress} /></section> : null}
-      {scanState === "complete" ? <MockReportPreview url={submittedUrl} /> : null}
+      {scanState === "complete" ? <ReportPreview url={submittedUrl} /> : null}
 
       <section id="product" className="px-5 py-16 sm:px-8">
         <SectionHeader eyebrow="The problem" title="Brands are invisible when AI cannot confidently cite them" description="AI search needs clear entities, answer-ready content, proof, structured data, and focused fixes. QueryCite turns those gaps into a practical report." />
@@ -243,13 +264,18 @@ export function HomeExperience() {
       </section>
 
       <section id="how-it-works" className="px-5 py-16 sm:px-8">
-        <SectionHeader eyebrow="How it works" title="From URL to report preview" description="The Phase 1 flow uses mock progress and mock report data while keeping the product path clear and easy to extend." />
+        <SectionHeader eyebrow="How it works" title="From URL to report preview" description="Enter a URL, review the scan progress, then see scores, findings, and full-report preview sections." />
         <div className="mx-auto mt-10 grid max-w-7xl gap-5 md:grid-cols-4">
-          {["Enter website URL", "Scan AI visibility signals", "Get report and fixes", "Unlock full report"].map((step, index) => (
+          {[
+            ["Enter website URL", "Add your website domain or full URL to start the audit flow."],
+            ["Scan AI visibility signals", "Review answer readiness, entity clarity, proof, schema, and report signals."],
+            ["Get report and fixes", "See scores, findings, and recommended next actions in a clean report."],
+            ["Unlock full report", "Preview deeper findings, competitor gaps, advisor notes, and exports."],
+          ].map(([step, description], index) => (
             <ClayCard key={step}>
               <div className="text-4xl font-semibold leading-none text-violet-700">0{index + 1}</div>
               <h3 className="mt-4 text-lg font-semibold leading-7 text-slate-950">{step}</h3>
-              <p className="mt-2 text-sm leading-6 text-slate-600">Mock Phase 1 step for the planned QueryCite workflow.</p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
             </ClayCard>
           ))}
         </div>
@@ -271,20 +297,21 @@ export function HomeExperience() {
       <section className="px-5 py-16 sm:px-8">
         <div className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-700">Pricing teaser</p>
-            <h2 className="mt-3 text-4xl font-semibold leading-tight text-slate-950">Free audit now, full report later</h2>
-            <p className="mt-4 text-base leading-7 text-slate-600">The Phase 1 interface shows the planned free and paid report split without connecting payment.</p>
-            <div className="mt-6"><PrimaryLink href="/pricing">View pricing preview</PrimaryLink></div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-700">Pricing</p>
+            <h2 className="mt-3 text-4xl font-semibold leading-tight text-slate-950">Start with a free audit. Unlock the full fix plan when you’re ready.</h2>
+            <p className="mt-4 text-base leading-7 text-slate-600">QueryCite shows your AI visibility gaps for free, then unlocks the complete AEO/GEO action plan, AI Advisor, competitor comparison, and export-ready reports in paid plans.</p>
+            <div className="mt-6"><PrimaryLink href="/pricing">View pricing</PrimaryLink></div>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <ClayCard><StatusPill tone="green">Free Audit</StatusPill><h3 className="mt-4 text-xl font-semibold leading-7">Scores and top findings</h3></ClayCard>
-            <ClayCard><StatusPill>Paid Full Report</StatusPill><h3 className="mt-4 text-xl font-semibold leading-7">All findings and fixes</h3></ClayCard>
+          <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+            <ClayCard><StatusPill tone="green">Free Audit</StatusPill><h3 className="mt-4 text-xl font-semibold leading-7">$0</h3></ClayCard>
+            <ClayCard><StatusPill>Launch Trial</StatusPill><h3 className="mt-4 text-xl font-semibold leading-7">$10 first month, then $29/month</h3></ClayCard>
+            <ClayCard><StatusPill tone="amber">Agency</StatusPill><h3 className="mt-4 text-xl font-semibold leading-7">From $149/month</h3></ClayCard>
           </div>
         </div>
       </section>
 
       <section id="integrations" className="px-5 py-16 sm:px-8">
-        <SectionHeader eyebrow="Integration status" title="Clear status labels, no unsupported claims" description="Generic placeholders show what is live now, in beta testing, and coming soon for the Phase 1 roadmap." />
+        <SectionHeader eyebrow="Integration status" title="Clear status labels, no unsupported claims" description="Integration availability is grouped as Live Now, Beta Testing, and Coming Soon so teams can understand what is available today." />
         <div className="mx-auto mt-10 grid max-w-7xl gap-5 md:grid-cols-3">
           {Object.entries({ "Live Now": integrations.liveNow, "Beta Testing": integrations.betaTesting, "Coming Soon": integrations.comingSoon }).map(([group, items]) => (
             <ClayCard key={group}>
@@ -311,8 +338,8 @@ export function HomeExperience() {
 
       <section className="px-5 py-16 sm:px-8">
         <div className="mx-auto max-w-7xl rounded-[2rem] bg-gradient-to-r from-slate-950 via-violet-950 to-teal-900 p-8 text-center text-white shadow-2xl shadow-slate-950/20 sm:p-12">
-          <h2 className="text-4xl font-semibold leading-tight">Run a free AI visibility audit preview</h2>
-          <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-violet-100">Use the mock Phase 1 flow to see how QueryCite will frame scores, findings, locked sections, and ready-to-use fixes.</p>
+          <h2 className="text-4xl font-semibold leading-tight">Run a free AI visibility audit</h2>
+          <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-violet-100">See how QueryCite frames scores, findings, locked sections, and ready-to-use AEO/GEO fixes.</p>
           <div className="mt-8"><Link href="/#audit" className="inline-flex min-h-12 items-center justify-center rounded-full bg-white px-6 text-sm font-semibold text-slate-950">Start free audit</Link></div>
         </div>
       </section>

@@ -19,8 +19,8 @@ export default function UseCasesPage() {
         ))}
       </section>
       <section className="mx-auto mt-12 max-w-7xl rounded-[2rem] bg-slate-950 p-8 text-center text-white sm:p-10">
-        <h2 className="text-3xl font-semibold leading-tight">Start with a free visibility audit preview</h2>
-        <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-300">The current Phase 1 flow uses mock scan and report data while the product experience is validated.</p>
+        <h2 className="text-3xl font-semibold leading-tight">Start with a free visibility audit</h2>
+        <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-300">Review how QueryCite frames scores, findings, and next steps for AI search readiness.</p>
         <div className="mt-7"><PrimaryLink href="/#audit">Run Free Audit</PrimaryLink></div>
       </section>
     </main>

@@ -1,5 +1,5 @@
 export const mockReport = {
-  websiteUrl: "https://examplebrand.com",
+  websiteUrl: "https://examplebrand.com/",
   scores: {
     aiVisibility: 64,
     aeo: 58,
@@ -31,10 +31,41 @@ export const mockReport = {
   ],
 };
 
+export const fullReportPreview = {
+  allFindings: [
+    "Service and category language should be repeated in the hero, metadata, and answer blocks.",
+    "The page needs concise buyer questions with direct answers for AEO readiness.",
+    "FAQ schema and organization schema should be added where appropriate.",
+    "Trust signals should be grouped near conversion sections and service explanations.",
+    "Internal links should connect product, use case, proof, and educational pages more clearly.",
+  ],
+  competitors: [
+    { name: "Competitor A", aiVisibility: 78, gap: "+14", reason: "Clearer category language and stronger proof blocks." },
+    { name: "Competitor B", aiVisibility: 72, gap: "+8", reason: "More complete FAQ coverage and structured summaries." },
+    { name: "Competitor C", aiVisibility: 69, gap: "+5", reason: "Better internal links between service and use case pages." },
+  ],
+  advisor: [
+    "Rewrite the hero support copy so the brand, product category, audience, and outcome are visible in one concise answer.",
+    "Add a buyer FAQ section that answers comparison, pricing, implementation, and proof questions directly.",
+    "Group testimonials, client logos, data points, and case examples near the service explanation for stronger trust signals.",
+  ],
+  fixes: [
+    { title: "Hero answer block", copy: "[Brand] helps [audience] solve [problem] with [category], delivering [primary outcome] through [proof point]." },
+    { title: "FAQ starter", copy: "What does [Brand] do? [Brand] provides [category] for [audience], helping teams [outcome] with [proof or differentiator]." },
+    { title: "Schema direction", copy: "Add Organization, WebSite, FAQPage, and Service schema where the page content supports those entities." },
+  ],
+  developerNotes: [
+    "Add JSON-LD to the page template and validate it before release.",
+    "Expose important FAQ copy in crawlable HTML rather than hiding it inside interactive-only elements.",
+    "Check that page title, meta description, H1, and first paragraph use consistent entity language.",
+  ],
+  exportOptions: ["Full PDF report", "Full CSV export", "Full shareable report", "Full email report"],
+};
+
 export const integrations = {
-  liveNow: ["Mock URL audit flow", "Mock report preview", "Static contact form UI"],
+  liveNow: ["URL audit form", "Report preview UI", "Contact form UI"],
   betaTesting: ["Shareable report workflow", "Email report workflow", "Agency reporting workspace"],
-  comingSoon: ["CMS publishing handoff", "Analytics connector placeholders", "Issue tracking handoff"],
+  comingSoon: ["CMS publishing handoff", "Analytics connector", "Issue tracking handoff"],
 };
 
 export const featureCards = [
@@ -64,7 +95,7 @@ export const resources = [
   ["AI Search Glossary", "Definitions for the terms teams need when discussing AI search readiness.", "Coming Soon"],
   ["SEO vs AEO vs GEO", "A static explainer for how these disciplines differ and overlap.", "Available"],
   ["Templates", "Reusable briefs, report outlines, and fix-planning templates.", "Coming Soon"],
-  ["Launch Notes", "Product and roadmap notes for the QueryCite Phase 1 website.", "Available"],
+  ["Launch Notes", "Product and roadmap notes for QueryCite.", "Available"],
 ];
 
 export const faqs = [
@@ -74,6 +105,6 @@ export const faqs = [
   ["What is GEO?", "GEO means Generative Engine Optimization. It focuses on making your brand, content, and website more discoverable and citation-ready for generative AI search experiences."],
   ["Who is QueryCite for?", "QueryCite is for SaaS brands, B2B companies, agencies, SEO teams, content teams, and founders."],
   ["What do I get in the free report?", "The free report includes basic AI Visibility, AEO/GEO scores, top findings, and limited export options."],
-  ["What is unlocked in the paid report?", "The paid report unlocks all findings, competitor comparison, AI Visibility Advisor, ready-to-paste fixes, developer notes, full PDF/CSV exports, and full shareable report."],
+  ["What is unlocked in the full report?", "The full report unlocks all findings, competitor comparison, AI Visibility Advisor, ready-to-paste fixes, developer notes, full PDF/CSV exports, and full shareable report."],
   ["Are integrations live?", "Only integrations clearly marked as Live Now should be treated as available. Beta Testing and Coming Soon items are roadmap indicators only."],
 ];

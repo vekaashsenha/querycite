@@ -24,11 +24,5 @@
                             "eslint-config-next":  "latest",
                             "tailwindcss":  "latest",
                             "typescript":  "latest"
-                        },
-    "pnpm":  {
-                 "onlyBuiltDependencies":  [
-                                               "sharp",
-                                               "unrs-resolver"
-                                           ]
-             }
+                        }
 }

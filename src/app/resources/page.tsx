@@ -11,8 +11,8 @@ export default function ResourcesPage() {
     <main className="px-5 py-16 sm:px-8">
       <PageIntro
         eyebrow="Resources"
-        title="Static Phase 1 resource library"
-        description="A launch-ready placeholder for educational resources without adding a CMS, database, admin panel, or publishing workflow yet."
+        title="Resources for AI search readiness"
+        description="A focused library for teams learning how AI visibility, AEO, GEO, and citation readiness fit into modern search strategy."
       />
       <section className="mx-auto mt-10 grid max-w-7xl gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {resources.map(([title, description, status]) => (
@@ -24,7 +24,7 @@ export default function ResourcesPage() {
         ))}
       </section>
       <p className="mx-auto mt-8 max-w-3xl text-center text-sm leading-6 text-slate-500">
-        For Phase 1, Resources are static. Later this can move to MDX or a CMS when publishing workflow requirements are defined.
+        Resources are currently curated as static launch materials and clearly marked by availability.
       </p>
     </main>
   );
