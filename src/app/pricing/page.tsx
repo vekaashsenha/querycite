@@ -23,7 +23,7 @@ const plans = [
     price: "$10 first month, then $29/month",
     bestFor: "Brands ready for the full fix plan",
     cta: "Unlock Full Report",
-    href: "/report?demo=full",
+    href: "/contact",
     tone: "violet" as const,
     highlighted: true,
     includes: [
@@ -59,7 +59,7 @@ export default function PricingPage() {
     <main className="px-5 py-16 sm:px-8">
       <PageIntro
         eyebrow="Pricing"
-        title="Start with a free audit. Unlock the full fix plan when you’re ready."
+        title="Start with a free audit. Unlock the full fix plan when you're ready."
         description="QueryCite shows your AI visibility gaps for free, then unlocks the complete AEO/GEO action plan, AI Advisor, competitor comparison, and export-ready reports in paid plans."
       />
       <section className="mx-auto mt-10 grid max-w-7xl gap-5 lg:grid-cols-3">

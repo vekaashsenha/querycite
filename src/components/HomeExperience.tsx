@@ -298,7 +298,7 @@ export function HomeExperience() {
         <div className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-700">Pricing</p>
-            <h2 className="mt-3 text-4xl font-semibold leading-tight text-slate-950">Start with a free audit. Unlock the full fix plan when you’re ready.</h2>
+            <h2 className="mt-3 text-4xl font-semibold leading-tight text-slate-950">Start with a free audit. Unlock the full fix plan when you&apos;re ready.</h2>
             <p className="mt-4 text-base leading-7 text-slate-600">QueryCite shows your AI visibility gaps for free, then unlocks the complete AEO/GEO action plan, AI Advisor, competitor comparison, and export-ready reports in paid plans.</p>
             <div className="mt-6"><PrimaryLink href="/pricing">View pricing</PrimaryLink></div>
           </div>
