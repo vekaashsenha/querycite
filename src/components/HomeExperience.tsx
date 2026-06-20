@@ -2,18 +2,19 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
-import { featureCards, faqs, integrations, mockReport, useCases } from "@/lib/mock";
+import { featureCards, faqs, integrations, useCases } from "@/lib/mock";
+import { auditStorageKey, type AuditApiResponse, type WebsiteAuditReport } from "@/lib/audit-report";
 import { normalizeWebsiteUrl, urlErrorMessage } from "@/lib/url";
 import { ClayCard, LockedPanel, PrimaryLink, ScoreRing, SectionHeader, StatusPill } from "@/components/ui";
 
-const scanSteps = ["Scanning website", "Checking AI visibility signals", "Reviewing AEO/GEO gaps", "Preparing report"];
+const scanSteps = ["Fetching homepage", "Checking AI visibility signals", "Scoring AEO/GEO readiness", "Preparing report"];
 const valueItems = ["Citation readiness", "AEO/GEO fixes", "Competitor gaps", "Export-ready reports"];
 const problemCards = [
   ["AI search cannot explain you clearly", "Weak entity signals make it harder for AI systems to identify what your brand does and who it serves."],
   ["Pages are not answer-ready", "Useful content often lacks concise answers, FAQs, proof points, and structure that AI can summarize."],
   ["Competitors may look more citeable", "Brands with clearer positioning, schema, trust signals, and content coverage can appear easier to recommend."],
 ];
-const outputCards = ["Limited branded PDF", "Basic CSV", "Share locked report preview", "Email report option"];
+const outputCards = ["Limited branded PDF preview", "CSV findings download", "Share report preview", "Email report preview"];
 
 function ScanState({ progress }: { progress: number }) {
   const activeStep = Math.min(scanSteps.length - 1, Math.floor(progress / 25));
@@ -24,7 +25,7 @@ function ScanState({ progress }: { progress: number }) {
         <div>
           <StatusPill>Scan in progress</StatusPill>
           <h2 className="mt-4 text-2xl font-semibold leading-tight text-slate-950">Preparing your AI Visibility Audit</h2>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600">Reviewing page structure, answer coverage, entity clarity, and report readiness.</p>
+          <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600">Fetching the website and checking content, technical, trust, schema, and answer-readiness signals.</p>
         </div>
         <div className="text-5xl font-semibold leading-none text-violet-700">{progress}%</div>
       </div>
@@ -49,23 +50,15 @@ function HeroPreview() {
       <ClayCard className="relative overflow-hidden bg-white/90 p-5">
         <div className="flex items-center justify-between gap-4 border-b border-slate-100 pb-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Audit snapshot</p>
-            <h2 className="mt-1 text-lg font-semibold text-slate-950">AI search readiness</h2>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Website-based audit</p>
+            <h2 className="mt-1 text-lg font-semibold text-slate-950">AI search readiness signals</h2>
           </div>
-          <StatusPill tone="green">Free audit</StatusPill>
+          <StatusPill tone="green">Real checks</StatusPill>
         </div>
-        <div className="mt-5 grid gap-4 sm:grid-cols-3">
-          <div className="rounded-2xl bg-violet-50 p-4"><p className="text-xs font-semibold text-violet-700">AI Visibility</p><p className="mt-3 text-3xl font-semibold text-slate-950">64</p></div>
-          <div className="rounded-2xl bg-teal-50 p-4"><p className="text-xs font-semibold text-teal-700">AEO</p><p className="mt-3 text-3xl font-semibold text-slate-950">58</p></div>
-          <div className="rounded-2xl bg-amber-50 p-4"><p className="text-xs font-semibold text-amber-800">GEO</p><p className="mt-3 text-3xl font-semibold text-slate-950">61</p></div>
-        </div>
-        <div className="mt-5 rounded-2xl border border-slate-100 bg-slate-50 p-4">
-          <div className="mb-3 flex items-center justify-between"><p className="text-sm font-semibold text-slate-950">Top visibility gaps</p><span className="text-xs font-semibold text-slate-500">3 shown</span></div>
-          <div className="grid gap-2">
-            {mockReport.topFindings.map((finding, index) => (
-              <div key={finding} className="rounded-xl bg-white px-3 py-2 text-xs leading-5 text-slate-600"><span className="font-semibold text-slate-950">{index + 1}.</span> {finding}</div>
-            ))}
-          </div>
+        <div className="mt-5 grid gap-3">
+          {["Homepage fetch and final URL", "Title, metadata, headings, schema", "Trust, FAQ, internal link, and content signals"].map((item) => (
+            <div key={item} className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm font-semibold leading-6 text-slate-700">{item}</div>
+          ))}
         </div>
       </ClayCard>
     </div>
@@ -86,24 +79,24 @@ function FeatureGlyph({ title }: { title: string }) {
   );
 }
 
-function ReportPreview({ url }: { url: string }) {
+function ReportPreview({ report }: { report: WebsiteAuditReport }) {
   return (
     <section id="report-preview" className="mx-auto w-full max-w-7xl px-5 py-10 sm:px-8">
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Free report</p>
-          <h2 className="mt-2 text-3xl font-semibold leading-tight text-slate-950">AI Visibility Audit snapshot</h2>
-          <p className="mt-2 text-sm text-slate-600">Website URL: {url || mockReport.websiteUrl}</p>
+          <h2 className="mt-2 text-3xl font-semibold leading-tight text-slate-950">Website-based AI Visibility Audit</h2>
+          <p className="mt-2 text-sm text-slate-600">Website URL: {report.finalUrl}</p>
         </div>
         <Link href="/report" className="inline-flex min-h-11 items-center justify-center rounded-full border border-slate-300 bg-white px-5 text-sm font-semibold text-slate-900 transition hover:border-slate-950">
-          Open full report preview
+          Open report
         </Link>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <ScoreRing label="AI Visibility Score" score={mockReport.scores.aiVisibility} tone="bg-violet-700" />
-        <ScoreRing label="AEO Score" score={mockReport.scores.aeo} tone="bg-teal-500" />
-        <ScoreRing label="GEO Score" score={mockReport.scores.geo} tone="bg-amber-400" />
+        <ScoreRing label="AI Visibility Score" score={report.scores.aiVisibility} tone="bg-violet-700" />
+        <ScoreRing label="AEO Readiness Score" score={report.scores.aeoReadiness} tone="bg-teal-500" />
+        <ScoreRing label="GEO Readiness Score" score={report.scores.geoReadiness} tone="bg-amber-400" />
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
@@ -113,9 +106,9 @@ function ReportPreview({ url }: { url: string }) {
             <StatusPill tone="green">Free</StatusPill>
           </div>
           <div className="mt-5 grid gap-3">
-            {mockReport.topFindings.map((finding, index) => (
-              <div key={finding} className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
-                <span className="mr-2 font-semibold text-slate-950">{index + 1}.</span>{finding}
+            {report.findings.slice(0, 3).map((finding, index) => (
+              <div key={finding.issue} className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
+                <span className="mr-2 font-semibold text-slate-950">{index + 1}.</span>{finding.issue}
               </div>
             ))}
           </div>
@@ -131,7 +124,7 @@ function ReportPreview({ url }: { url: string }) {
       </div>
 
       <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {mockReport.lockedSections.slice(0, 4).map((section) => (
+        {["All findings", "AI Visibility Advisor", "Developer action notes", "PDF/share/email previews"].map((section) => (
           <LockedPanel key={section} title={section} description="Available in the full report" />
         ))}
       </div>
@@ -142,43 +135,58 @@ function ReportPreview({ url }: { url: string }) {
 export function HomeExperience() {
   const [url, setUrl] = useState("");
   const [urlError, setUrlError] = useState("");
-  const [submittedUrl, setSubmittedUrl] = useState("");
   const [scanState, setScanState] = useState<"idle" | "scanning" | "complete">("idle");
   const [progress, setProgress] = useState(0);
+  const [report, setReport] = useState<WebsiteAuditReport | null>(null);
 
   useEffect(() => {
     if (scanState !== "scanning") return;
 
     const timer = window.setInterval(() => {
-      setProgress((current) => {
-        const nextProgress = Math.min(100, current + 10);
-        if (nextProgress === 100) {
-          window.clearInterval(timer);
-          window.setTimeout(() => setScanState("complete"), 450);
-        }
-        return nextProgress;
-      });
-    }, 260);
+      setProgress((current) => Math.min(90, current + 7));
+    }, 350);
 
     return () => window.clearInterval(timer);
   }, [scanState]);
 
-  function runAudit(event: FormEvent<HTMLFormElement>) {
+  async function runAudit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     const normalizedUrl = normalizeWebsiteUrl(url);
     if (!normalizedUrl) {
       setUrlError(urlErrorMessage);
       setScanState("idle");
-      setSubmittedUrl("");
+      setReport(null);
       return;
     }
 
     setUrlError("");
     setUrl(normalizedUrl);
-    setSubmittedUrl(normalizedUrl);
-    setProgress(0);
+    setReport(null);
+    setProgress(8);
     setScanState("scanning");
+
+    try {
+      const response = await fetch("/api/audit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: normalizedUrl }),
+      });
+      const data = (await response.json()) as Partial<AuditApiResponse> & { error?: string };
+
+      if (!response.ok || !data.report) {
+        throw new Error(data.error || "Could not complete the website-based audit.");
+      }
+
+      window.localStorage.setItem(auditStorageKey, JSON.stringify(data.report));
+      setReport(data.report);
+      setProgress(100);
+      setScanState("complete");
+    } catch (error) {
+      setUrlError(error instanceof Error ? error.message : "Could not complete the website-based audit.");
+      setScanState("idle");
+      setProgress(0);
+    }
   }
 
   return (
@@ -200,7 +208,7 @@ export function HomeExperience() {
           <div className="grid gap-5">
             <ClayCard className="bg-white/90">
               <h2 className="text-2xl font-semibold leading-tight text-slate-950">Run a free AI visibility audit</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-600">Enter your website to start the free audit flow.</p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">Enter your website to start a website-based AI visibility readiness audit.</p>
               <form onSubmit={runAudit} className="mt-6 grid gap-3" noValidate>
                 <label htmlFor="audit-url" className="text-sm font-semibold text-slate-700">Website URL</label>
                 <input
@@ -219,8 +227,8 @@ export function HomeExperience() {
                   className="min-h-14 rounded-2xl border border-slate-200 bg-white px-5 text-base outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
                 />
                 {urlError ? <p id="audit-url-error" className="text-sm font-semibold leading-5 text-rose-600">{urlError}</p> : null}
-                <button type="submit" className="min-h-14 rounded-2xl bg-slate-950 px-6 text-sm font-semibold text-white shadow-lg shadow-slate-950/15 transition hover:-translate-y-0.5 hover:bg-slate-800">
-                  Run Free AI Visibility Audit
+                <button type="submit" disabled={scanState === "scanning"} className="min-h-14 rounded-2xl bg-slate-950 px-6 text-sm font-semibold text-white shadow-lg shadow-slate-950/15 transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400">
+                  {scanState === "scanning" ? "Running audit..." : "Run Free AI Visibility Audit"}
                 </button>
               </form>
             </ClayCard>
@@ -236,7 +244,7 @@ export function HomeExperience() {
       </section>
 
       {scanState === "scanning" ? <section className="mx-auto w-full max-w-7xl px-5 py-10 sm:px-8"><ScanState progress={progress} /></section> : null}
-      {scanState === "complete" ? <ReportPreview url={submittedUrl} /> : null}
+      {scanState === "complete" && report ? <ReportPreview report={report} /> : null}
 
       <section id="product" className="px-5 py-16 sm:px-8">
         <SectionHeader eyebrow="The problem" title="Brands are invisible when AI cannot confidently cite them" description="AI search needs clear entities, answer-ready content, proof, structured data, and focused fixes. QueryCite turns those gaps into a practical report." />
@@ -270,7 +278,7 @@ export function HomeExperience() {
             ["Enter website URL", "Add your website domain or full URL to start the audit flow."],
             ["Scan AI visibility signals", "Review answer readiness, entity clarity, proof, schema, and report signals."],
             ["Get report and fixes", "See scores, findings, and recommended next actions in a clean report."],
-            ["Unlock full report", "Preview deeper findings, competitor gaps, advisor notes, and exports."],
+            ["Unlock full report", "Preview deeper findings, advisor notes, developer notes, and exports."],
           ].map(([step, description], index) => (
             <ClayCard key={step}>
               <div className="text-4xl font-semibold leading-none text-violet-700">0{index + 1}</div>
@@ -299,7 +307,7 @@ export function HomeExperience() {
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-700">Pricing</p>
             <h2 className="mt-3 text-4xl font-semibold leading-tight text-slate-950">Start with a free audit. Unlock the full fix plan when you&apos;re ready.</h2>
-            <p className="mt-4 text-base leading-7 text-slate-600">QueryCite shows your AI visibility gaps for free, then unlocks the complete AEO/GEO action plan, AI Advisor, competitor comparison, and export-ready reports in paid plans.</p>
+            <p className="mt-4 text-base leading-7 text-slate-600">QueryCite shows your AI visibility gaps for free, then unlocks the complete AEO/GEO action plan, AI Advisor, and export-ready reports in paid plans.</p>
             <div className="mt-6"><PrimaryLink href="/pricing">View pricing</PrimaryLink></div>
           </div>
           <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
