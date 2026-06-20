@@ -1,17 +1,19 @@
 export const integrations = {
   liveNow: ["No external integrations live yet"],
-  betaTesting: ["Gemini-powered AI Advisor", "Shareable report workflow", "Agency reporting workspace"],
-  comingSoon: ["CMS publishing handoff", "Analytics connector", "Issue tracking handoff"],
+  betaTesting: ["Gemini-powered AI Advisor", "Private beta feedback capture"],
+  comingSoon: ["Shareable report workflow", "Email report workflow", "Agency reporting workspace", "CMS publishing handoff", "Analytics connector", "Issue tracking handoff"],
 };
 
 export const featureCards = [
   ["AI Visibility Score", "See whether your brand, category, and proof points are clear enough for AI search experiences."],
   ["AEO Score", "Find gaps in answer-ready content, FAQs, and direct response structure."],
-  ["GEO Score", "Review signals that affect generative search summaries and citation readiness."],
+  ["GEO Score", "Review signals that affect generative search summaries, structured context, and citation readiness."],
+  ["AI Crawler Readiness Score", "See whether important AI and search crawlers are allowed, blocked, not mentioned, or need review."],
+  ["llms.txt guidance", "Check whether a guidance file exists and generate a draft that points AI agents to important public pages."],
   ["Competitor Comparison", "Preview where competitors may look clearer or more complete to AI systems."],
   ["AI Visibility Advisor", "Get guided next steps for improving entity clarity, trust, and answer coverage."],
-  ["Ready-to-paste fixes", "Prepare copy blocks, FAQs, schema, and page updates your team can use."],
-  ["Developer notes", "Translate visibility gaps into practical implementation notes."],
+  ["Ready-to-paste Fix Pack", "Prepare metadata, homepage copy, FAQ ideas, schema, llms.txt, and team notes your team can review."],
+  ["Developer notes", "Translate crawler, llms.txt, schema, metadata, and internal linking gaps into implementation notes."],
   ["PDF/CSV reports", "Package free and full report outputs for internal teams or clients."],
   ["Share and email report", "Prepare stakeholder-friendly delivery options for audit findings."],
 ];
@@ -41,6 +43,6 @@ export const faqs = [
   ["What is GEO?", "GEO means Generative Engine Optimization. It focuses on making your brand, content, and website more discoverable and citation-ready for generative AI search experiences."],
   ["Who is QueryCite for?", "QueryCite is for SaaS brands, B2B companies, agencies, SEO teams, content teams, and founders."],
   ["What do I get in the free report?", "The free report includes basic AI Visibility, AEO/GEO scores, top findings, and limited export options."],
-  ["What is unlocked in the full report?", "The full report unlocks all findings, competitor comparison, AI Visibility Advisor, ready-to-paste fixes, developer notes, full PDF/CSV exports, and full shareable report."],
+  ["What is unlocked in the full report?", "The full report unlocks all findings, AI crawler details, llms.txt guidance, competitor comparison, AI Visibility Advisor, ready-to-paste fixes, developer notes, full PDF/CSV exports, and full shareable report."],
   ["Are integrations live?", "Only integrations clearly marked as Live Now should be treated as available. Beta Testing and Coming Soon items are roadmap indicators only."],
 ];

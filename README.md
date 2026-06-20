@@ -10,10 +10,13 @@ A Next.js MVP for QueryCite, an AI Visibility Audit and AEO/GEO fix generator Sa
 pnpm install
 ```
 
-2. Create `.env.local` from `.env.example` and add your Gemini API key:
+2. Create `.env.local` from `.env.example` and add environment variables:
 
 ```bash
 GEMINI_API_KEY=your_gemini_api_key_here
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url_here
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key_here
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key_here
 ```
 
 Optional model overrides:
@@ -33,29 +36,115 @@ pnpm dev
 
 Open `http://localhost:3000`.
 
-## Gemini Environment Variables
+## Vercel Environment Variables
 
-Required:
+Add these in Vercel Project Settings > Environment Variables for Production and Preview:
 
-```bash
-GEMINI_API_KEY=your_gemini_api_key_here
-```
+- `GEMINI_API_KEY`
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `NEXT_PUBLIC_RAZORPAY_KEY_ID`
+- `RAZORPAY_KEY_SECRET`
+- `RAZORPAY_WEBHOOK_SECRET`
+- `RAZORPAY_STARTER_PLAN_ID`
+- `RAZORPAY_PRO_PLAN_ID`
+- `RAZORPAY_AGENCY_PLAN_ID`
+- `RESEND_API_KEY`
+- `EMAIL_FROM`
+- `EMAIL_REPLY_TO`
+- `ADMIN_NOTIFICATION_EMAIL`
+- `NEXT_PUBLIC_APP_URL`
 
-Local setup:
+Never expose `SUPABASE_SERVICE_ROLE_KEY` in client components or browser code.
 
-- Add `GEMINI_API_KEY` to `.env.local`.
-- Restart the dev server after changing environment variables.
+## Supabase Schema
 
-Vercel setup:
+The schema is in `supabase/schema.sql`.
 
-- Open the Vercel project.
-- Go to Settings > Environment Variables.
-- Add `GEMINI_API_KEY` for Production, Preview, and Development as needed.
-- Redeploy after saving the variable.
+To apply it:
+
+1. Open the Supabase project.
+2. Go to SQL Editor.
+3. Paste the contents of `supabase/schema.sql`.
+4. Run the script.
+5. Confirm RLS is enabled on all QueryCite tables.
+
+The schema prepares profiles, company profiles, competitors, audits, reports, Advisor messages, credit usage, feedback, exports, subscriptions, and payments placeholders. Razorpay is not implemented yet.
+
+## What Works Now
+
+- Free no-login URL audit flow.
+- URL normalization for domains such as `byldgroup.com`.
+- Website-based readiness scoring from real homepage, robots.txt crawler access, llms.txt, schema, content, technical, and trust signals.
+- `/report` limited free report with locked full-report sections.
+- `/report?demo=full` private beta full-report preview.
+- Gemini-powered AI Advisor in beta full-report mode.
+- CSV findings export with score category, issue, priority, owner, why it matters, recommended fix, fix type, and category columns.
+- Contact/feedback submission to Supabase when Supabase env variables and schema are configured.
+
+## Beta Preview / Coming Soon
+
+- Competitor comparison UI is a beta preview until login, saved competitor setup, and competitor crawling are implemented.
+- Competitor setup fields are not saved until beta login is enabled.
+- PDF export, share report, and email report are labelled preview/coming soon.
+- Dashboard, profile, and saved report history pages are backend-ready placeholders until auth is enabled.
+- Subscriptions and payments tables are placeholders for later Razorpay integration.
 
 ## AI Visibility Advisor
 
-The private beta Advisor is available at `/report?demo=full`. The frontend calls `/api/advisor/chat`, and the API route uses `GEMINI_API_KEY` only on the server. The Advisor is scoped to the current report data and should only answer questions about the AI Visibility report, AEO/GEO fixes, competitor gaps, content improvements, developer notes, exports, and next steps.
+The private beta Advisor is available at `/report?demo=full`. The frontend calls `/api/advisor/chat`, and the API route uses `GEMINI_API_KEY` only on the server. The Advisor is scoped to the current report data and only answers questions about the AI Visibility report, AEO/GEO fixes, competitor gaps, content improvements, developer notes, exports, and next steps.
+
+
+## Razorpay Test Mode
+
+Razorpay is wired for Test Mode only.
+
+Required environment variables:
+
+```bash
+NEXT_PUBLIC_RAZORPAY_KEY_ID=your_razorpay_test_key_id_here
+RAZORPAY_KEY_SECRET=your_razorpay_test_key_secret_here
+RAZORPAY_WEBHOOK_SECRET=your_razorpay_test_webhook_secret_here
+RAZORPAY_STARTER_PLAN_ID=your_razorpay_starter_plan_id_here
+RAZORPAY_PRO_PLAN_ID=your_razorpay_pro_plan_id_here
+RAZORPAY_AGENCY_PLAN_ID=your_razorpay_agency_plan_id_here
+NEXT_PUBLIC_APP_URL=https://www.querycite.com
+```
+
+Webhook URL:
+
+```bash
+https://www.querycite.com/api/razorpay/webhook
+```
+
+In Razorpay Test Mode, create subscription plans, copy the plan IDs into environment variables, then add a webhook for subscription and payment events. Paid access must be based on verified webhook records in Supabase, not frontend checkout success.
+
+To test checkout, open `/pricing`, use a `Start Test Checkout` button, complete the Razorpay test checkout, then confirm the webhook wrote subscription/payment rows in Supabase.
+
+## Resend Transactional Email
+
+Required environment variables:
+
+```bash
+RESEND_API_KEY=your_resend_api_key_here
+EMAIL_FROM=QueryCite <hello@querycite.com>
+EMAIL_REPLY_TO=hello@querycite.com
+ADMIN_NOTIFICATION_EMAIL=hello@querycite.com
+```
+
+Emails are sent for lead capture, feedback, payment success/failure, and subscription status events. Email failures are logged server-side and should not break the audit, lead, feedback, or webhook flows.
+
+Verify email sending by submitting the lead form or contact form with Resend env variables configured, then checking Resend activity and the `email_events` table in Supabase.
+
+## Before Live Payment Launch
+
+- Switch Razorpay keys from Test Mode to Live Mode only after subscription testing is complete.
+- Add authentication and account mapping.
+- Use verified subscription status for full report access.
+- Add customer-facing billing management and cancellation flows.
+- Finalize billing, refund, and subscription policy pages.
+- Confirm webhook retries, email deliverability, and Supabase RLS policies in production.
 
 ## Checks
 

@@ -102,7 +102,7 @@ export async function POST(request: Request) {
     }
 
     if (!process.env.GEMINI_API_KEY) {
-      return NextResponse.json({ error: "GEMINI_API_KEY is missing. Add it to your environment variables and restart the app." }, { status: 500 });
+      return NextResponse.json({ error: "AI Advisor is unavailable because Gemini is not configured, but your audit report is still available." }, { status: 500 });
     }
 
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });

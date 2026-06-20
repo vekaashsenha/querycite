@@ -7,8 +7,8 @@ import { auditStorageKey, type AuditApiResponse, type WebsiteAuditReport } from 
 import { normalizeWebsiteUrl, urlErrorMessage } from "@/lib/url";
 import { ClayCard, LockedPanel, PrimaryLink, ScoreRing, SectionHeader, StatusPill } from "@/components/ui";
 
-const scanSteps = ["Fetching homepage", "Checking AI visibility signals", "Scoring AEO/GEO readiness", "Preparing report"];
-const valueItems = ["Citation readiness", "AEO/GEO fixes", "Competitor gaps", "Export-ready reports"];
+const scanSteps = ["Fetching homepage", "Checking crawler and llms.txt signals", "Scoring AEO/GEO readiness", "Preparing fix-ready report"];
+const valueItems = ["AEO/GEO fixes", "AI crawler readiness", "llms.txt guidance", "Export-ready reports"];
 const problemCards = [
   ["AI search cannot explain you clearly", "Weak entity signals make it harder for AI systems to identify what your brand does and who it serves."],
   ["Pages are not answer-ready", "Useful content often lacks concise answers, FAQs, proof points, and structure that AI can summarize."],
@@ -16,6 +16,150 @@ const problemCards = [
 ];
 const outputCards = ["Limited branded PDF preview", "CSV findings download", "Share report preview", "Email report preview"];
 
+const leadSubmittedKey = "querycite_lead_submitted";
+const leadEmailKey = "querycite_lead_email";
+
+function hasSubmittedLeadThisSession() {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.sessionStorage.getItem(leadSubmittedKey) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function markLeadSubmitted(email: string) {
+  try {
+    window.sessionStorage.setItem(leadSubmittedKey, "true");
+    window.sessionStorage.setItem(leadEmailKey, email);
+  } catch {
+    // Session storage is only a convenience flag and is not used for paid access.
+  }
+}
+
+function storeReportForReportPage(report: WebsiteAuditReport) {
+  window.localStorage.setItem(auditStorageKey, JSON.stringify(report));
+}
+
+function isValidEmail(email: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+}
+
+function LeadCaptureModal({ report, onSuccess }: { report: WebsiteAuditReport; onSuccess: (email: string) => void }) {
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [role, setRole] = useState("");
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
+  const [marketingConsent, setMarketingConsent] = useState(false);
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  async function submitLead(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const trimmedName = fullName.trim();
+    const trimmedEmail = email.trim().toLowerCase();
+
+    if (!trimmedName) {
+      setError("Please enter your full name.");
+      return;
+    }
+
+    if (!isValidEmail(trimmedEmail)) {
+      setError("Please enter a valid work email.");
+      return;
+    }
+
+    if (!privacyAccepted) {
+      setError("Please accept the Privacy Policy and Terms of Use to view your report.");
+      return;
+    }
+
+    setError("");
+    setIsSubmitting(true);
+
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const response = await fetch("/api/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fullName: trimmedName,
+          email: trimmedEmail,
+          companyName,
+          role,
+          websiteUrl: report.finalUrl,
+          auditUrl: report.websiteUrl,
+          source: "free_audit_gate",
+          utmSource: params.get("utm_source") ?? "",
+          utmMedium: params.get("utm_medium") ?? "",
+          utmCampaign: params.get("utm_campaign") ?? "",
+          privacyTermsAccepted: privacyAccepted,
+          marketingConsent,
+        }),
+      });
+      const data = (await response.json()) as { error?: string };
+
+      if (!response.ok) {
+        throw new Error(data.error || "We could not save your details right now. Please try again or contact hello@querycite.com.");
+      }
+
+      onSuccess(trimmedEmail);
+    } catch (leadError) {
+      setError(leadError instanceof Error ? leadError.message : "We could not save your details right now. Please try again or contact hello@querycite.com.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/50 px-4 py-8 backdrop-blur-sm">
+      <div className="w-full max-w-2xl rounded-[2rem] border border-white/80 bg-white p-6 shadow-2xl shadow-slate-950/25 sm:p-8">
+        <StatusPill tone="violet">Free report access</StatusPill>
+        <h2 className="mt-4 text-3xl font-semibold leading-tight text-slate-950">Get your free AI Visibility Report</h2>
+        <p className="mt-3 text-sm leading-6 text-slate-600">Enter your details to view your website-based AEO/GEO readiness report. We will use your information to share your report and relevant QueryCite updates.</p>
+        <p className="mt-3 rounded-2xl border border-slate-100 bg-slate-50 p-3 text-xs font-semibold leading-5 text-slate-600">Scanned website: {report.finalUrl}</p>
+
+        <form onSubmit={submitLead} className="mt-6 grid gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="grid gap-2 text-sm font-semibold text-slate-700">
+              Full name
+              <input value={fullName} onChange={(event) => setFullName(event.target.value)} className="min-h-12 rounded-2xl border border-slate-200 px-4 text-sm outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100" />
+            </label>
+            <label className="grid gap-2 text-sm font-semibold text-slate-700">
+              Work email
+              <input value={email} onChange={(event) => setEmail(event.target.value)} inputMode="email" className="min-h-12 rounded-2xl border border-slate-200 px-4 text-sm outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100" />
+            </label>
+            <label className="grid gap-2 text-sm font-semibold text-slate-700">
+              Company name <span className="font-medium text-slate-400">optional</span>
+              <input value={companyName} onChange={(event) => setCompanyName(event.target.value)} className="min-h-12 rounded-2xl border border-slate-200 px-4 text-sm outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100" />
+            </label>
+            <label className="grid gap-2 text-sm font-semibold text-slate-700">
+              Role <span className="font-medium text-slate-400">optional</span>
+              <input value={role} onChange={(event) => setRole(event.target.value)} className="min-h-12 rounded-2xl border border-slate-200 px-4 text-sm outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100" />
+            </label>
+          </div>
+
+          <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-semibold leading-6 text-slate-700">
+            <input type="checkbox" checked={privacyAccepted} onChange={(event) => setPrivacyAccepted(event.target.checked)} className="mt-1 size-4 rounded border-slate-300" />
+            <span>I agree to the <Link href="/privacy" className="text-violet-700 underline">Privacy Policy</Link> and <Link href="/terms" className="text-violet-700 underline">Terms of Use</Link>.</span>
+          </label>
+
+          <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-sm font-semibold leading-6 text-slate-700">
+            <input type="checkbox" checked={marketingConsent} onChange={(event) => setMarketingConsent(event.target.checked)} className="mt-1 size-4 rounded border-slate-300" />
+            <span>Send me QueryCite product updates and audit insights. <span className="block text-xs font-medium text-slate-500">You can opt out anytime.</span></span>
+          </label>
+
+          {error ? <p className="rounded-2xl border border-rose-100 bg-rose-50 p-3 text-sm font-semibold text-rose-700">{error}</p> : null}
+
+          <button type="submit" disabled={isSubmitting} className="min-h-12 rounded-2xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-950/15 transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400">
+            {isSubmitting ? "Saving details..." : "View My Free Report"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
 function ScanState({ progress }: { progress: number }) {
   const activeStep = Math.min(scanSteps.length - 1, Math.floor(progress / 25));
 
@@ -25,7 +169,7 @@ function ScanState({ progress }: { progress: number }) {
         <div>
           <StatusPill>Scan in progress</StatusPill>
           <h2 className="mt-4 text-2xl font-semibold leading-tight text-slate-950">Preparing your AI Visibility Audit</h2>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600">Fetching the website and checking content, technical, trust, schema, and answer-readiness signals.</p>
+          <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600">Fetching the website and checking content, crawler access, llms.txt, trust, schema, and answer-readiness signals.</p>
         </div>
         <div className="text-5xl font-semibold leading-none text-violet-700">{progress}%</div>
       </div>
@@ -56,7 +200,7 @@ function HeroPreview() {
           <StatusPill tone="green">Real checks</StatusPill>
         </div>
         <div className="mt-5 grid gap-3">
-          {["Homepage fetch and final URL", "Title, metadata, headings, schema", "Trust, FAQ, internal link, and content signals"].map((item) => (
+          {["Homepage fetch and final URL", "Title, metadata, headings, schema", "AI crawler and robots.txt signals", "llms.txt, trust, FAQ, and internal links"].map((item) => (
             <div key={item} className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm font-semibold leading-6 text-slate-700">{item}</div>
           ))}
         </div>
@@ -93,10 +237,11 @@ function ReportPreview({ report }: { report: WebsiteAuditReport }) {
         </Link>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <ScoreRing label="AI Visibility Score" score={report.scores.aiVisibility} tone="bg-violet-700" />
         <ScoreRing label="AEO Readiness Score" score={report.scores.aeoReadiness} tone="bg-teal-500" />
         <ScoreRing label="GEO Readiness Score" score={report.scores.geoReadiness} tone="bg-amber-400" />
+        <ScoreRing label="AI Crawler Readiness Score" score={report.scores.aiCrawlerReadiness} tone="bg-cyan-500" />
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
@@ -124,7 +269,7 @@ function ReportPreview({ report }: { report: WebsiteAuditReport }) {
       </div>
 
       <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {["All findings", "AI Visibility Advisor", "Developer action notes", "PDF/share/email previews"].map((section) => (
+        {["All findings", "AI Crawler Readiness details", "llms.txt generator", "AI Visibility Advisor", "Developer action notes", "PDF/share/email previews"].map((section) => (
           <LockedPanel key={section} title={section} description="Available in the full report" />
         ))}
       </div>
@@ -138,6 +283,8 @@ export function HomeExperience() {
   const [scanState, setScanState] = useState<"idle" | "scanning" | "complete">("idle");
   const [progress, setProgress] = useState(0);
   const [report, setReport] = useState<WebsiteAuditReport | null>(null);
+  const [canShowReport, setCanShowReport] = useState(false);
+  const [isLeadGateOpen, setIsLeadGateOpen] = useState(false);
 
   useEffect(() => {
     if (scanState !== "scanning") return;
@@ -157,12 +304,16 @@ export function HomeExperience() {
       setUrlError(urlErrorMessage);
       setScanState("idle");
       setReport(null);
+      setCanShowReport(false);
+      setIsLeadGateOpen(false);
       return;
     }
 
     setUrlError("");
     setUrl(normalizedUrl);
     setReport(null);
+    setCanShowReport(false);
+    setIsLeadGateOpen(false);
     setProgress(8);
     setScanState("scanning");
 
@@ -175,18 +326,35 @@ export function HomeExperience() {
       const data = (await response.json()) as Partial<AuditApiResponse> & { error?: string };
 
       if (!response.ok || !data.report) {
-        throw new Error(data.error || "Could not complete the website-based audit.");
+        throw new Error(data.error || "The audit service is temporarily unavailable. Please try again.");
       }
 
-      window.localStorage.setItem(auditStorageKey, JSON.stringify(data.report));
       setReport(data.report);
       setProgress(100);
       setScanState("complete");
+
+      if (hasSubmittedLeadThisSession()) {
+        storeReportForReportPage(data.report);
+        setCanShowReport(true);
+      } else {
+        setCanShowReport(false);
+        setIsLeadGateOpen(true);
+      }
     } catch (error) {
-      setUrlError(error instanceof Error ? error.message : "Could not complete the website-based audit.");
+      setUrlError(error instanceof Error ? error.message : "The audit service is temporarily unavailable. Please try again.");
       setScanState("idle");
       setProgress(0);
+      setCanShowReport(false);
+      setIsLeadGateOpen(false);
     }
+  }
+
+  function handleLeadSuccess(email: string) {
+    if (!report) return;
+    markLeadSubmitted(email);
+    storeReportForReportPage(report);
+    setCanShowReport(true);
+    setIsLeadGateOpen(false);
   }
 
   return (
@@ -243,8 +411,24 @@ export function HomeExperience() {
         </div>
       </section>
 
+      <section className="px-5 py-12 sm:px-8">
+        <div className="mx-auto grid max-w-7xl gap-6 rounded-[2rem] border border-white/70 bg-gradient-to-r from-violet-50 via-white to-teal-50 p-6 shadow-sm lg:grid-cols-[0.95fr_1.05fr] lg:items-center lg:p-8">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-700">Why QueryCite is different</p>
+            <h2 className="mt-3 text-3xl font-semibold leading-tight text-slate-950">Free checkers show your score. QueryCite turns the score into fixes.</h2>
+            <p className="mt-4 text-sm leading-6 text-slate-600">The report connects AI visibility scoring to crawler access, llms.txt guidance, schema, metadata, content, developer notes, and export-ready next steps.</p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {["Crawler readiness details", "llms.txt draft", "Ready-to-paste fixes", "Developer action notes"].map((item) => (
+              <div key={item} className="rounded-2xl border border-white/70 bg-white p-4 text-sm font-semibold text-slate-700 shadow-sm">{item}</div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {scanState === "scanning" ? <section className="mx-auto w-full max-w-7xl px-5 py-10 sm:px-8"><ScanState progress={progress} /></section> : null}
-      {scanState === "complete" && report ? <ReportPreview report={report} /> : null}
+      {isLeadGateOpen && report ? <LeadCaptureModal report={report} onSuccess={handleLeadSuccess} /> : null}
+      {scanState === "complete" && report && canShowReport ? <ReportPreview report={report} /> : null}
 
       <section id="product" className="px-5 py-16 sm:px-8">
         <SectionHeader eyebrow="The problem" title="Brands are invisible when AI cannot confidently cite them" description="AI search needs clear entities, answer-ready content, proof, structured data, and focused fixes. QueryCite turns those gaps into a practical report." />

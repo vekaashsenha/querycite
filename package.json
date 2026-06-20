@@ -1,28 +1,28 @@
 {
-    "name":  "ai-visibility-auditor",
-    "version":  "0.1.0",
-    "private":  true,
-    "scripts":  {
-                    "dev":  "next dev",
-                    "build":  "next build",
-                    "start":  "next start",
-                    "lint":  "eslint"
-                },
-    "dependencies":  {
-                         "@tailwindcss/postcss":  "latest",
-                         "cheerio":  "latest",
-                         "next":  "latest",
-                         "react":  "latest",
-                         "react-dom":  "latest",
-                         "@google/genai":  "latest"
-                     },
-    "devDependencies":  {
-                            "@types/node":  "latest",
-                            "@types/react":  "latest",
-                            "@types/react-dom":  "latest",
-                            "eslint":  "^9.39.1",
-                            "eslint-config-next":  "latest",
-                            "tailwindcss":  "latest",
-                            "typescript":  "latest"
-                        }
+    "name": "ai-visibility-auditor",
+    "version": "0.1.0",
+    "private": true,
+    "scripts": {
+        "dev": "next dev",
+        "build": "next build",
+        "start": "next start",
+        "lint": "eslint"
+    },
+    "dependencies": {
+        "@google/genai": "latest",
+        "@tailwindcss/postcss": "latest",
+        "cheerio": "latest",
+        "next": "latest",
+        "react": "latest",
+        "react-dom": "latest"
+    },
+    "devDependencies": {
+        "@types/node": "latest",
+        "@types/react": "latest",
+        "@types/react-dom": "latest",
+        "eslint": "^9.39.4",
+        "eslint-config-next": "latest",
+        "tailwindcss": "latest",
+        "typescript": "latest"
+    }
 }

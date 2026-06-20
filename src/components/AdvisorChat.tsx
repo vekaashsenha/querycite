@@ -118,9 +118,10 @@ export function AdvisorChat({ currentReportData, planType }: AdvisorChatProps) {
       setMessages((current) => [...current, createMessage("assistant", data.reply ?? advisorErrorCopy)]);
       // TODO: Replace local credit tracking with database-backed monthly usage after auth/subscriptions are added.
       setCreditsUsed((current) => Math.min(creditLimit, current + 1));
-    } catch {
-      setError(advisorErrorCopy);
-      setMessages((current) => [...current, createMessage("assistant", advisorErrorCopy)]);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : advisorErrorCopy;
+      setError(message);
+      setMessages((current) => [...current, createMessage("assistant", message)]);
     } finally {
       setIsLoading(false);
     }
