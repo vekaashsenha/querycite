@@ -242,6 +242,9 @@ alter table public.payments add column if not exists product text not null defau
 alter table public.payments add column if not exists razorpay_customer_id text;
 alter table public.payments add column if not exists razorpay_subscription_id text;
 alter table public.payments add column if not exists razorpay_payment_id text;
+alter table public.payments add column if not exists razorpay_order_id text;
+alter table public.payments add column if not exists payment_type text;
+alter table public.payments add column if not exists plan_name text;
 alter table public.payments add column if not exists amount int;
 alter table public.payments add column if not exists raw_event jsonb;
 
@@ -280,6 +283,8 @@ create index if not exists subscriptions_email_idx on public.subscriptions(email
 create index if not exists subscriptions_paid_access_idx on public.subscriptions(paid_access);
 create index if not exists payments_razorpay_payment_id_idx on public.payments(razorpay_payment_id);
 create index if not exists payments_razorpay_subscription_id_idx on public.payments(razorpay_subscription_id);
+create index if not exists payments_razorpay_order_id_idx on public.payments(razorpay_order_id);
+create index if not exists payments_payment_type_idx on public.payments(payment_type);
 create index if not exists payments_email_idx on public.payments(email);
 create index if not exists email_events_recipient_email_idx on public.email_events(recipient_email);
 create index if not exists email_events_created_at_idx on public.email_events(created_at desc);

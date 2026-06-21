@@ -71,8 +71,6 @@ const plans = [
 ];
 
 export default function PricingPage() {
-  const hasAgencyPlan = Boolean(process.env.RAZORPAY_AGENCY_PLAN_ID);
-
   return (
     <main className="px-5 py-16 sm:px-8">
       <PageIntro
@@ -82,8 +80,6 @@ export default function PricingPage() {
       />
       <section className="mx-auto mt-10 grid max-w-7xl gap-5 lg:grid-cols-4">
         {plans.map((plan) => {
-          const showCheckout = plan.planKey === "starter" || plan.planKey === "pro" || (plan.planKey === "agency" && hasAgencyPlan);
-
           return (
             <ClayCard key={plan.name} className={`flex flex-col p-5 ${plan.highlighted ? "border-violet-200 bg-violet-50/70 shadow-[0_24px_70px_rgba(91,33,182,0.14)]" : ""}`}>
               <div className="flex items-start justify-between gap-3">
@@ -109,7 +105,7 @@ export default function PricingPage() {
 
               <div className="mt-6 flex-1" />
               {plan.planKey ? (
-                showCheckout ? <RazorpayCheckoutButton plan={plan.planKey} /> : <PrimaryLink href="/contact">Contact Us</PrimaryLink>
+                <RazorpayCheckoutButton plan={plan.planKey} mode="order" />
               ) : (
                 <PrimaryLink href={plan.href}>Run Free Audit</PrimaryLink>
               )}

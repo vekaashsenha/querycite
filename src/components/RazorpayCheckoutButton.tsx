@@ -3,11 +3,15 @@
 import { useState } from "react";
 
 type RazorpayPlan = "starter" | "pro" | "agency";
+type RazorpayMode = "order" | "subscription";
 
 type CheckoutResponse = {
   key_id: string;
-  subscription_id: string;
   plan_name: RazorpayPlan;
+  subscription_id?: string;
+  order_id?: string;
+  amount?: number;
+  currency?: "INR";
   prefill?: {
     name?: string;
     email?: string;
@@ -17,6 +21,7 @@ type CheckoutResponse = {
 
 type RazorpayCheckoutButtonProps = {
   plan: RazorpayPlan;
+  mode?: RazorpayMode;
   name?: string;
   email?: string;
   websiteUrl?: string;
@@ -30,13 +35,16 @@ type RazorpayInstance = {
 
 type RazorpayOptions = {
   key: string;
-  subscription_id: string;
+  order_id?: string;
+  subscription_id?: string;
+  amount?: number;
+  currency?: string;
   name: string;
   description: string;
   prefill?: { name?: string; email?: string };
   notes?: Record<string, string>;
   theme?: { color?: string };
-  handler: (response: { razorpay_subscription_id?: string }) => void;
+  handler: (response: { razorpay_subscription_id?: string; razorpay_order_id?: string }) => void;
   modal?: { ondismiss?: () => void };
 };
 
@@ -65,16 +73,18 @@ function loadRazorpayScript() {
   return razorpayScriptPromise;
 }
 
-export function RazorpayCheckoutButton({ plan, name, email, websiteUrl, companyName, className = "" }: RazorpayCheckoutButtonProps) {
+export function RazorpayCheckoutButton({ plan, mode = "order", name, email, websiteUrl, companyName, className = "" }: RazorpayCheckoutButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const isOrderMode = mode === "order";
 
   async function startCheckout() {
     setIsLoading(true);
     setError("");
 
     try {
-      const response = await fetch("/api/razorpay/create-subscription", {
+      const endpoint = isOrderMode ? "/api/razorpay/create-order" : "/api/razorpay/create-subscription";
+      const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -86,9 +96,10 @@ export function RazorpayCheckoutButton({ plan, name, email, websiteUrl, companyN
         }),
       });
       const data = (await response.json()) as CheckoutResponse;
+      const checkoutId = isOrderMode ? data.order_id : data.subscription_id;
 
-      if (!response.ok || !data.subscription_id) {
-        throw new Error(data.error || "Razorpay test checkout is temporarily unavailable.");
+      if (!response.ok || !checkoutId) {
+        throw new Error(data.error || "Razorpay test payment is temporarily unavailable.");
       }
 
       await loadRazorpayScript();
@@ -96,18 +107,28 @@ export function RazorpayCheckoutButton({ plan, name, email, websiteUrl, companyN
 
       const checkout = new window.Razorpay({
         key: data.key_id,
-        subscription_id: data.subscription_id,
+        order_id: isOrderMode ? data.order_id : undefined,
+        subscription_id: isOrderMode ? undefined : data.subscription_id,
+        amount: data.amount,
+        currency: data.currency || "INR",
         name: "QueryCite",
-        description: `QueryCite ${data.plan_name} subscription test checkout`,
+        description: isOrderMode ? `QueryCite ${data.plan_name} one-time test payment` : `QueryCite ${data.plan_name} subscription test checkout`,
         prefill: data.prefill,
         notes: {
           product: "querycite",
+          payment_type: isOrderMode ? "one_time_test" : "subscription_test",
           plan_name: data.plan_name,
           source: "querycite_pricing",
         },
         theme: { color: "#0f172a" },
         handler: (checkoutResponse) => {
-          const subscriptionId = checkoutResponse.razorpay_subscription_id || data.subscription_id;
+          if (isOrderMode) {
+            const orderId = checkoutResponse.razorpay_order_id || data.order_id || checkoutId;
+            window.location.href = `/payment/success?order_id=${encodeURIComponent(orderId)}`;
+            return;
+          }
+
+          const subscriptionId = checkoutResponse.razorpay_subscription_id || data.subscription_id || checkoutId;
           window.location.href = `/payment/success?subscription_id=${encodeURIComponent(subscriptionId)}`;
         },
         modal: {
@@ -119,7 +140,7 @@ export function RazorpayCheckoutButton({ plan, name, email, websiteUrl, companyN
 
       checkout.open();
     } catch (checkoutError) {
-      setError(checkoutError instanceof Error ? checkoutError.message : "Razorpay test checkout is temporarily unavailable.");
+      setError(checkoutError instanceof Error ? checkoutError.message : "Razorpay test payment is temporarily unavailable.");
     } finally {
       setIsLoading(false);
     }
@@ -128,9 +149,11 @@ export function RazorpayCheckoutButton({ plan, name, email, websiteUrl, companyN
   return (
     <div className="grid gap-2">
       <button type="button" onClick={startCheckout} disabled={isLoading} className={`inline-flex min-h-12 items-center justify-center rounded-full bg-slate-950 px-6 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(15,23,42,0.18)] transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400 ${className}`}>
-        {isLoading ? "Opening test checkout..." : "Start Test Checkout"}
+        {isLoading ? "Opening test payment..." : isOrderMode ? "Start Test Payment" : "Start Test Checkout"}
       </button>
-      <p className="text-xs font-semibold leading-5 text-slate-500">Payment flow is currently in test mode for private validation.</p>
+      <p className="text-xs font-semibold leading-5 text-slate-500">
+        {isOrderMode ? "Subscription billing is being tested separately. This test payment validates checkout, webhook, Supabase records, and email flow." : "Payment flow is currently in test mode for private validation."}
+      </p>
       {error ? <p className="rounded-2xl border border-amber-100 bg-amber-50 p-3 text-xs font-semibold leading-5 text-amber-900">{error}</p> : null}
     </div>
   );

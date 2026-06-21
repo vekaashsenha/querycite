@@ -56,6 +56,14 @@ function planNameFrom(subscription: JsonRecord, payment: JsonRecord) {
   return text(notesFrom(subscription).plan_name) || text(notesFrom(payment).plan_name) || "starter";
 }
 
+function paymentTypeFrom(subscription: JsonRecord, payment: JsonRecord) {
+  const explicitPaymentType = text(notesFrom(payment).payment_type) || text(notesFrom(subscription).payment_type);
+  if (explicitPaymentType) return explicitPaymentType;
+  if (text(payment.subscription_id) || text(subscription.id)) return "subscription_test";
+  if (text(payment.order_id)) return "one_time_test";
+  return "unknown";
+}
+
 function websiteFrom(subscription: JsonRecord, payment: JsonRecord) {
   return text(notesFrom(subscription).website_url) || text(notesFrom(payment).website_url);
 }
@@ -156,9 +164,12 @@ async function upsertPayment(payload: JsonRecord, eventName: string, subscriptio
     provider_payment_id: paymentId,
     provider_invoice_id: text(payment.invoice_id),
     razorpay_payment_id: paymentId,
+    razorpay_order_id: text(payment.order_id),
     razorpay_subscription_id: text(payment.subscription_id) || text(subscription.id),
     razorpay_customer_id: text(payment.customer_id) || text(subscription.customer_id),
     product: "querycite",
+    payment_type: paymentTypeFrom(subscription, payment),
+    plan_name: planNameFrom(subscription, payment),
     email: emailFrom(subscription, payment),
     amount: numberValue(payment.amount),
     amount_cents: numberValue(payment.amount),

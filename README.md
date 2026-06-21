@@ -70,7 +70,7 @@ To apply it:
 4. Run the script.
 5. Confirm RLS is enabled on all QueryCite tables.
 
-The schema prepares profiles, company profiles, competitors, audits, reports, Advisor messages, credit usage, feedback, exports, subscriptions, and payments placeholders. Razorpay is not implemented yet.
+The schema prepares profiles, company profiles, competitors, audits, reports, Advisor messages, credit usage, feedback, exports, subscriptions, payments, and Razorpay Test Mode webhook storage.
 
 ## What Works Now
 
@@ -89,7 +89,7 @@ The schema prepares profiles, company profiles, competitors, audits, reports, Ad
 - Competitor setup fields are not saved until beta login is enabled.
 - PDF export, share report, and email report are labelled preview/coming soon.
 - Dashboard, profile, and saved report history pages are backend-ready placeholders until auth is enabled.
-- Subscriptions and payments tables are placeholders for later Razorpay integration.
+- Razorpay subscription code is retained for later, while pricing currently uses one-time Test Mode orders until recurring billing is approved.
 
 ## AI Visibility Advisor
 
@@ -98,18 +98,23 @@ The private beta Advisor is available at `/report?demo=full`. The frontend calls
 
 ## Razorpay Test Mode
 
-Razorpay is wired for Test Mode only.
+Razorpay is wired for Test Mode only. Pricing currently uses one-time order checkout because recurring subscriptions are not enabled on the merchant account yet. Subscription backend code remains in place for later approval.
 
-Required environment variables:
+Required environment variables for one-time order testing:
 
 ```bash
 NEXT_PUBLIC_RAZORPAY_KEY_ID=your_razorpay_test_key_id_here
 RAZORPAY_KEY_SECRET=your_razorpay_test_key_secret_here
 RAZORPAY_WEBHOOK_SECRET=your_razorpay_test_webhook_secret_here
+NEXT_PUBLIC_APP_URL=https://www.querycite.com
+```
+
+Subscription test variables, needed only after recurring billing is enabled:
+
+```bash
 RAZORPAY_STARTER_PLAN_ID=your_razorpay_starter_plan_id_here
 RAZORPAY_PRO_PLAN_ID=your_razorpay_pro_plan_id_here
 RAZORPAY_AGENCY_PLAN_ID=your_razorpay_agency_plan_id_here
-NEXT_PUBLIC_APP_URL=https://www.querycite.com
 ```
 
 Webhook URL:
@@ -118,9 +123,9 @@ Webhook URL:
 https://www.querycite.com/api/razorpay/webhook
 ```
 
-In Razorpay Test Mode, create subscription plans, copy the plan IDs into environment variables, then add a webhook for subscription and payment events. Paid access must be based on verified webhook records in Supabase, not frontend checkout success.
+Paid access must be based on verified subscription records in Supabase, not frontend checkout success. One-time test order payments validate checkout, webhook, Supabase payment records, and email flow only; they do not unlock long-term paid subscription access.
 
-To test checkout, open `/pricing`, use a `Start Test Checkout` button, complete the Razorpay test checkout, then confirm the webhook wrote subscription/payment rows in Supabase.
+To test checkout, open `/pricing`, use a `Start Test Payment` button, complete the Razorpay test order checkout, then confirm the webhook wrote a payment row in Supabase.
 
 ## Resend Transactional Email
 

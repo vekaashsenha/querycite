@@ -254,12 +254,15 @@ export type Payment = {
   subscription_id: string | null;
   provider: "razorpay" | "placeholder";
   product: string;
+  payment_type: string | null;
+  plan_name: string | null;
   email: string | null;
   provider_payment_id: string | null;
   provider_invoice_id: string | null;
   razorpay_customer_id: string | null;
   razorpay_subscription_id: string | null;
   razorpay_payment_id: string | null;
+  razorpay_order_id: string | null;
   amount: number | null;
   amount_cents: number | null;
   currency: string;

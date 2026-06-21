@@ -20,6 +20,18 @@ export type RazorpaySubscriptionCheckoutData = {
   };
 };
 
+export type RazorpayOrderCheckoutData = {
+  key_id: string;
+  order_id: string;
+  amount: number;
+  currency: "INR";
+  plan_name: RazorpayPlanName;
+  prefill: {
+    name?: string;
+    email?: string;
+  };
+};
+
 const razorpayApiBase = "https://api.razorpay.com/v1";
 
 const planEnvMap: Record<RazorpayPlanName, string> = {
@@ -28,8 +40,18 @@ const planEnvMap: Record<RazorpayPlanName, string> = {
   agency: "RAZORPAY_AGENCY_PLAN_ID",
 };
 
+const oneTimeOrderPrices: Record<RazorpayPlanName, number> = {
+  starter: 149900,
+  pro: 499900,
+  agency: 999900,
+};
+
 export function isRazorpayPlanName(value: unknown): value is RazorpayPlanName {
   return value === "starter" || value === "pro" || value === "agency";
+}
+
+export function getOneTimeOrderAmount(plan: RazorpayPlanName) {
+  return oneTimeOrderPrices[plan];
 }
 
 function getRequiredEnv(name: string) {
@@ -39,7 +61,11 @@ function getRequiredEnv(name: string) {
 }
 
 export function getRazorpayPublicKeyId() {
-  return getRequiredEnv("NEXT_PUBLIC_RAZORPAY_KEY_ID");
+  const keyId = getRequiredEnv("NEXT_PUBLIC_RAZORPAY_KEY_ID");
+  if (!keyId.startsWith("rzp_test_")) {
+    throw new Error("Razorpay Test Mode key is required for QueryCite payment testing.");
+  }
+  return keyId;
 }
 
 export function getRazorpayWebhookSecret() {
@@ -97,6 +123,51 @@ export async function createRazorpaySubscription(input: RazorpaySubscriptionInpu
   return {
     key_id: keyId,
     subscription_id: data.id,
+    plan_name: input.plan,
+    prefill: {
+      name: input.name,
+      email: input.email,
+    },
+  };
+}
+
+export async function createRazorpayOrder(input: RazorpaySubscriptionInput): Promise<RazorpayOrderCheckoutData> {
+  assertRazorpayServerConfigured();
+  const keyId = getRazorpayPublicKeyId();
+  const amount = getOneTimeOrderAmount(input.plan);
+
+  const response = await fetch(`${razorpayApiBase}/orders`, {
+    method: "POST",
+    headers: {
+      Authorization: getBasicAuthHeader(),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      amount,
+      currency: "INR",
+      receipt: `querycite_${input.plan}_${Date.now()}`.slice(0, 40),
+      notes: {
+        product: "querycite",
+        payment_type: "one_time_test",
+        plan_name: input.plan,
+        website_url: input.websiteUrl || "",
+        company_name: input.companyName || "",
+        source: "querycite_pricing",
+      },
+    }),
+  });
+
+  const data = (await response.json().catch(() => ({}))) as { id?: string; amount?: number; error?: { description?: string } };
+
+  if (!response.ok || !data.id) {
+    throw new Error(data.error?.description || "Could not create Razorpay test order.");
+  }
+
+  return {
+    key_id: keyId,
+    order_id: data.id,
+    amount: typeof data.amount === "number" ? data.amount : amount,
+    currency: "INR",
     plan_name: input.plan,
     prefill: {
       name: input.name,
