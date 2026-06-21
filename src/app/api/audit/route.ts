@@ -512,7 +512,7 @@ function buildScoreExplanations(checks: Record<string, AuditCheck>, findings: Au
 }
 
 async function persistAuditReport(report: WebsiteAuditReport, normalizedUrl: string) {
-  if (!isSupabaseAdminConfigured()) return;
+  if (!isSupabaseAdminConfigured()) return { auditId: null, reportId: null };
 
   try {
     const auditRows = await insertSupabaseRow("audits", {
@@ -536,7 +536,7 @@ async function persistAuditReport(report: WebsiteAuditReport, normalizedUrl: str
     });
     const auditId = typeof auditRows[0]?.id === "string" ? auditRows[0].id : null;
 
-    await insertSupabaseRow("reports", {
+    const reportRows = await insertSupabaseRow("reports", {
       audit_id: auditId,
       website_url: report.websiteUrl,
       final_url: report.finalUrl,
@@ -554,11 +554,14 @@ async function persistAuditReport(report: WebsiteAuditReport, normalizedUrl: str
       advisor_context: report,
       full_report_data: report,
     });
+    const reportId = typeof reportRows[0]?.id === "string" ? reportRows[0].id : null;
+
+    return { auditId, reportId };
   } catch (error) {
     console.error("Supabase audit persistence failed", error);
+    return { auditId: null, reportId: null };
   }
 }
-
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as AuditRequest;
@@ -698,9 +701,14 @@ export async function POST(request: Request) {
       },
     };
 
-    await persistAuditReport(report, normalizedUrl);
+    const savedReport = await persistAuditReport(report, normalizedUrl);
+    const responseReport: WebsiteAuditReport = {
+      ...report,
+      reportId: savedReport.reportId ?? undefined,
+      auditId: savedReport.auditId,
+    };
 
-    return NextResponse.json({ report });
+    return NextResponse.json({ report: responseReport });
   } catch (error) {
     logAuditDebug("unexpected_error", { error: error instanceof Error ? error.message : "unknown" });
     return NextResponse.json({ error: "The audit service is temporarily unavailable. Please try again." }, { status: 500 });

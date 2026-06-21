@@ -51,6 +51,8 @@ export type LlmsTxtResult = {
 
 export type WebsiteAuditReport = {
   reportVersion: "website-readiness-v1";
+  reportId?: string;
+  auditId?: string | null;
   websiteUrl: string;
   finalUrl: string;
   scannedAt: string;

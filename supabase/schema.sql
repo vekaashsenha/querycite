@@ -39,8 +39,25 @@ create table if not exists public.profiles (
   updated_at timestamptz not null default now()
 );
 
-alter table public.company_profiles
-  add constraint company_profiles_owner_domain_unique unique (owner_user_id, primary_domain);
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'company_profiles_owner_domain_unique'
+      and conrelid = 'public.company_profiles'::regclass
+  )
+  and not exists (
+    select 1
+    from pg_class
+    where relname = 'company_profiles_owner_domain_unique'
+      and relnamespace = 'public'::regnamespace
+  ) then
+    alter table public.company_profiles
+      add constraint company_profiles_owner_domain_unique unique (owner_user_id, primary_domain);
+  end if;
+end;
+$$;
 
 create table if not exists public.competitors (
   id uuid primary key default gen_random_uuid(),
@@ -226,6 +243,40 @@ create table if not exists public.payments (
 );
 
 
+-- Paid SaaS foundation additions for private beta.
+alter table public.company_profiles alter column owner_user_id drop not null;
+alter table public.company_profiles add column if not exists email text;
+alter table public.company_profiles add column if not exists subscription_id text;
+alter table public.company_profiles add column if not exists contact_name text;
+alter table public.company_profiles add column if not exists role_designation text;
+alter table public.company_profiles add column if not exists company_size text;
+alter table public.company_profiles add column if not exists target_audience text;
+alter table public.company_profiles add column if not exists main_keywords text;
+alter table public.company_profiles add column if not exists primary_geography text;
+alter table public.company_profiles add column if not exists tone_of_voice text;
+
+alter table public.competitors alter column user_id drop not null;
+alter table public.competitors add column if not exists email text;
+alter table public.competitors add column if not exists subscription_id text;
+
+alter table public.competitor_change_limits alter column user_id drop not null;
+alter table public.competitor_change_limits add column if not exists email text;
+alter table public.competitor_change_limits add column if not exists subscription_id text;
+
+alter table public.leads add column if not exists report_id uuid references public.reports(id) on delete set null;
+
+alter table public.advisor_credit_usage alter column user_id drop not null;
+alter table public.advisor_credit_usage add column if not exists email text;
+alter table public.advisor_credit_usage add column if not exists subscription_id text;
+alter table public.advisor_credit_usage add column if not exists report_id uuid references public.reports(id) on delete set null;
+alter table public.advisor_credit_usage add column if not exists advisor_credits_limit int not null default 0;
+alter table public.advisor_credit_usage add column if not exists advisor_credits_used int not null default 0;
+alter table public.advisor_credit_usage add column if not exists blog_briefs_limit int not null default 0;
+alter table public.advisor_credit_usage add column if not exists blog_briefs_used int not null default 0;
+alter table public.advisor_credit_usage add column if not exists fix_packs_limit int not null default 0;
+alter table public.advisor_credit_usage add column if not exists fix_packs_used int not null default 0;
+alter table public.advisor_credit_usage add column if not exists competitor_advice_limit int not null default 0;
+alter table public.advisor_credit_usage add column if not exists competitor_advice_used int not null default 0;
 -- Razorpay test-mode and transactional email additions.
 alter table public.subscriptions alter column user_id drop not null;
 alter table public.subscriptions add column if not exists email text;
@@ -262,15 +313,20 @@ create table if not exists public.email_events (
 );
 
 create index if not exists company_profiles_owner_user_id_idx on public.company_profiles(owner_user_id);
+create index if not exists company_profiles_subscription_id_idx on public.company_profiles(subscription_id);
+create index if not exists company_profiles_email_idx on public.company_profiles(email);
 create index if not exists competitors_company_profile_id_idx on public.competitors(company_profile_id);
 create index if not exists competitors_user_id_idx on public.competitors(user_id);
+create index if not exists competitors_subscription_id_idx on public.competitors(subscription_id);
 create index if not exists competitor_change_limits_user_id_idx on public.competitor_change_limits(user_id);
+create index if not exists competitor_change_limits_subscription_id_idx on public.competitor_change_limits(subscription_id);
 create index if not exists audits_user_id_created_at_idx on public.audits(user_id, created_at desc);
 create index if not exists reports_user_id_created_at_idx on public.reports(user_id, created_at desc);
 create index if not exists reports_company_profile_id_created_at_idx on public.reports(company_profile_id, created_at desc);
 create index if not exists advisor_messages_user_id_created_at_idx on public.advisor_messages(user_id, created_at desc);
 create index if not exists advisor_messages_report_id_created_at_idx on public.advisor_messages(report_id, created_at desc);
 create index if not exists advisor_credit_usage_user_id_idx on public.advisor_credit_usage(user_id);
+create index if not exists advisor_credit_usage_subscription_id_idx on public.advisor_credit_usage(subscription_id);
 create index if not exists feedback_work_email_idx on public.feedback(work_email);
 create index if not exists leads_email_idx on public.leads(email);
 create index if not exists leads_website_url_idx on public.leads(website_url);
@@ -289,17 +345,40 @@ create index if not exists payments_email_idx on public.payments(email);
 create index if not exists email_events_recipient_email_idx on public.email_events(recipient_email);
 create index if not exists email_events_created_at_idx on public.email_events(created_at desc);
 
+drop trigger if exists set_company_profiles_updated_at on public.company_profiles;
 create trigger set_company_profiles_updated_at before update on public.company_profiles for each row execute function public.set_updated_at();
+
+drop trigger if exists set_profiles_updated_at on public.profiles;
 create trigger set_profiles_updated_at before update on public.profiles for each row execute function public.set_updated_at();
+
+drop trigger if exists set_competitors_updated_at on public.competitors;
 create trigger set_competitors_updated_at before update on public.competitors for each row execute function public.set_updated_at();
+
+drop trigger if exists set_competitor_change_limits_updated_at on public.competitor_change_limits;
 create trigger set_competitor_change_limits_updated_at before update on public.competitor_change_limits for each row execute function public.set_updated_at();
+
+drop trigger if exists set_audits_updated_at on public.audits;
 create trigger set_audits_updated_at before update on public.audits for each row execute function public.set_updated_at();
+
+drop trigger if exists set_reports_updated_at on public.reports;
 create trigger set_reports_updated_at before update on public.reports for each row execute function public.set_updated_at();
+
+drop trigger if exists set_advisor_credit_usage_updated_at on public.advisor_credit_usage;
 create trigger set_advisor_credit_usage_updated_at before update on public.advisor_credit_usage for each row execute function public.set_updated_at();
+
+drop trigger if exists set_feedback_updated_at on public.feedback;
 create trigger set_feedback_updated_at before update on public.feedback for each row execute function public.set_updated_at();
+
+drop trigger if exists set_leads_updated_at on public.leads;
 create trigger set_leads_updated_at before update on public.leads for each row execute function public.set_updated_at();
+
+drop trigger if exists set_exports_updated_at on public.exports;
 create trigger set_exports_updated_at before update on public.exports for each row execute function public.set_updated_at();
+
+drop trigger if exists set_subscriptions_updated_at on public.subscriptions;
 create trigger set_subscriptions_updated_at before update on public.subscriptions for each row execute function public.set_updated_at();
+
+drop trigger if exists set_payments_updated_at on public.payments;
 create trigger set_payments_updated_at before update on public.payments for each row execute function public.set_updated_at();
 
 alter table public.profiles enable row level security;
@@ -317,45 +396,74 @@ alter table public.subscriptions enable row level security;
 alter table public.payments enable row level security;
 alter table public.email_events enable row level security;
 
+drop policy if exists "profiles_select_own" on public.profiles;
 create policy "profiles_select_own" on public.profiles for select using (id = auth.uid());
+drop policy if exists "profiles_update_own" on public.profiles;
 create policy "profiles_update_own" on public.profiles for update using (id = auth.uid()) with check (id = auth.uid());
+drop policy if exists "profiles_insert_own" on public.profiles;
 create policy "profiles_insert_own" on public.profiles for insert with check (id = auth.uid());
 
+drop policy if exists "company_profiles_select_own" on public.company_profiles;
 create policy "company_profiles_select_own" on public.company_profiles for select using (owner_user_id = auth.uid());
+drop policy if exists "company_profiles_insert_own" on public.company_profiles;
 create policy "company_profiles_insert_own" on public.company_profiles for insert with check (owner_user_id = auth.uid());
+drop policy if exists "company_profiles_update_own" on public.company_profiles;
 create policy "company_profiles_update_own" on public.company_profiles for update using (owner_user_id = auth.uid()) with check (owner_user_id = auth.uid());
 
+drop policy if exists "competitors_select_own" on public.competitors;
 create policy "competitors_select_own" on public.competitors for select using (user_id = auth.uid());
+drop policy if exists "competitors_insert_own" on public.competitors;
 create policy "competitors_insert_own" on public.competitors for insert with check (user_id = auth.uid());
+drop policy if exists "competitors_update_own" on public.competitors;
 create policy "competitors_update_own" on public.competitors for update using (user_id = auth.uid()) with check (user_id = auth.uid());
 
+drop policy if exists "competitor_limits_select_own" on public.competitor_change_limits;
 create policy "competitor_limits_select_own" on public.competitor_change_limits for select using (user_id = auth.uid());
+drop policy if exists "competitor_limits_insert_own" on public.competitor_change_limits;
 create policy "competitor_limits_insert_own" on public.competitor_change_limits for insert with check (user_id = auth.uid());
+drop policy if exists "competitor_limits_update_own" on public.competitor_change_limits;
 create policy "competitor_limits_update_own" on public.competitor_change_limits for update using (user_id = auth.uid()) with check (user_id = auth.uid());
 
+drop policy if exists "audits_select_own" on public.audits;
 create policy "audits_select_own" on public.audits for select using (user_id = auth.uid());
+drop policy if exists "audits_insert_own_or_anonymous" on public.audits;
 create policy "audits_insert_own_or_anonymous" on public.audits for insert with check (user_id = auth.uid() or user_id is null);
+drop policy if exists "audits_update_own" on public.audits;
 create policy "audits_update_own" on public.audits for update using (user_id = auth.uid()) with check (user_id = auth.uid());
 
+drop policy if exists "reports_select_own" on public.reports;
 create policy "reports_select_own" on public.reports for select using (user_id = auth.uid());
+drop policy if exists "reports_insert_own_or_anonymous" on public.reports;
 create policy "reports_insert_own_or_anonymous" on public.reports for insert with check (user_id = auth.uid() or user_id is null);
+drop policy if exists "reports_update_own" on public.reports;
 create policy "reports_update_own" on public.reports for update using (user_id = auth.uid()) with check (user_id = auth.uid());
 
+drop policy if exists "advisor_messages_select_own" on public.advisor_messages;
 create policy "advisor_messages_select_own" on public.advisor_messages for select using (user_id = auth.uid());
+drop policy if exists "advisor_messages_insert_own" on public.advisor_messages;
 create policy "advisor_messages_insert_own" on public.advisor_messages for insert with check (user_id = auth.uid());
 
+drop policy if exists "advisor_credit_usage_select_own" on public.advisor_credit_usage;
 create policy "advisor_credit_usage_select_own" on public.advisor_credit_usage for select using (user_id = auth.uid());
+drop policy if exists "advisor_credit_usage_insert_own" on public.advisor_credit_usage;
 create policy "advisor_credit_usage_insert_own" on public.advisor_credit_usage for insert with check (user_id = auth.uid());
+drop policy if exists "advisor_credit_usage_update_own" on public.advisor_credit_usage;
 create policy "advisor_credit_usage_update_own" on public.advisor_credit_usage for update using (user_id = auth.uid()) with check (user_id = auth.uid());
 
+drop policy if exists "feedback_insert_anyone" on public.feedback;
 create policy "feedback_insert_anyone" on public.feedback for insert with check (true);
+drop policy if exists "feedback_select_own" on public.feedback;
 create policy "feedback_select_own" on public.feedback for select using (user_id = auth.uid() or work_email = auth.email());
 -- Leads are inserted server-side with the Supabase service role, which bypasses RLS. Do not expose the service role key to the browser.
 
+drop policy if exists "exports_select_own" on public.exports;
 create policy "exports_select_own" on public.exports for select using (user_id = auth.uid());
+drop policy if exists "exports_insert_own" on public.exports;
 create policy "exports_insert_own" on public.exports for insert with check (user_id = auth.uid());
 
+drop policy if exists "subscriptions_select_own" on public.subscriptions;
 create policy "subscriptions_select_own" on public.subscriptions for select using (user_id = auth.uid());
+drop policy if exists "payments_select_own" on public.payments;
 create policy "payments_select_own" on public.payments for select using (user_id = auth.uid());
 -- Email events are inserted server-side with the Supabase service role, which bypasses RLS.
 

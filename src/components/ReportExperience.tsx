@@ -1,13 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { AdvisorChat } from "@/components/AdvisorChat";
 import { ClayCard, LockedPanel, ScoreRing, SectionHeader, StatusPill } from "@/components/ui";
 import { auditStorageKey, isWebsiteAuditReport, type AuditFinding, type ScoreName, type WebsiteAuditReport } from "@/lib/audit-report";
+import type { PaidPlanName } from "@/lib/plans";
 
 type ReportExperienceProps = {
   isFullDemo: boolean;
+  reportId?: string | null;
+  subscriptionId?: string | null;
+  hasVerifiedFullAccess?: boolean;
+  paidPlanName?: PaidPlanName;
 };
 
 type ScoreCardConfig = readonly [label: string, key: ScoreName, value: number, tone: string];
@@ -86,6 +91,126 @@ function downloadFindingsCsv(report: WebsiteAuditReport) {
   link.remove();
   URL.revokeObjectURL(url);
 }
+
+function pdfSafeText(value: string) {
+  return value
+    .replace(/[^\x20-\x7E]/g, " ")
+    .replace(/\\/g, "\\\\")
+    .replace(/\(/g, "\\(")
+    .replace(/\)/g, "\\)")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function wrapPdfLine(value: string, width = 92) {
+  const words = pdfSafeText(value).split(" ").filter(Boolean);
+  const lines: string[] = [];
+  let current = "";
+
+  for (const word of words) {
+    const next = current ? `${current} ${word}` : word;
+    if (next.length > width && current) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = next;
+    }
+  }
+
+  if (current) lines.push(current);
+  return lines.length ? lines : [""];
+}
+
+function createPdfBlob(lines: string[]) {
+  const pageCapacity = 45;
+  const pages = Array.from({ length: Math.max(1, Math.ceil(lines.length / pageCapacity)) }, (_, index) => lines.slice(index * pageCapacity, (index + 1) * pageCapacity));
+  const objects: string[] = ["<< /Type /Catalog /Pages 2 0 R >>"];
+  const pageRefs: string[] = [];
+  const fontObjectNumber = 3 + pages.length * 2;
+
+  objects.push("");
+
+  pages.forEach((pageLines, index) => {
+    const pageObjectNumber = 3 + index * 2;
+    const contentObjectNumber = pageObjectNumber + 1;
+    pageRefs.push(`${pageObjectNumber} 0 R`);
+    objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 ${fontObjectNumber} 0 R >> >> /Contents ${contentObjectNumber} 0 R >>`);
+    const stream = [`BT`, `/F1 10 Tf`, `50 742 Td`, `14 TL`, ...pageLines.map((line) => `(${pdfSafeText(line)}) Tj T*`), `ET`].join("\n");
+    objects.push(`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`);
+  });
+
+  objects[1] = `<< /Type /Pages /Kids [${pageRefs.join(" ")}] /Count ${pages.length} >>`;
+  objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
+
+  let pdf = "%PDF-1.4\n";
+  const offsets = [0];
+  objects.forEach((object, index) => {
+    offsets.push(pdf.length);
+    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  });
+  const xrefOffset = pdf.length;
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  offsets.slice(1).forEach((offset) => {
+    pdf += `${String(offset).padStart(10, "0")} 00000 n \n`;
+  });
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+
+  return new Blob([pdf], { type: "application/pdf" });
+}
+
+function reportPdfLines(report: WebsiteAuditReport, fullAccess?: boolean) {
+  const mode = fullAccess ? "Full AI Visibility Report" : "Limited Free AI Visibility Report";
+  const lines = [
+    "QueryCite",
+    mode,
+    `Website: ${report.finalUrl}`,
+    `Scanned: ${new Date(report.scannedAt).toLocaleString()}`,
+    "",
+    "Scores",
+    `AI Visibility Score: ${report.scores.aiVisibility}/100`,
+    `AEO Readiness Score: ${report.scores.aeoReadiness}/100`,
+    `GEO Readiness Score: ${report.scores.geoReadiness}/100`,
+    `AI Crawler Readiness Score: ${report.scores.aiCrawlerReadiness}/100`,
+    "",
+    fullAccess ? "Findings" : "Top 3 Findings",
+  ];
+
+  const findings = fullAccess ? report.findings : report.findings.slice(0, 3);
+  findings.forEach((finding, index) => {
+    lines.push(`${index + 1}. ${finding.issue}`);
+    lines.push(`Priority: ${finding.priority} | Owner: ${finding.owner}`);
+    lines.push(`Why it matters: ${finding.whyItMatters}`);
+    lines.push(`Recommended fix: ${finding.recommendedFix}`);
+    lines.push("");
+  });
+
+  if (fullAccess) {
+    lines.push("Developer Notes");
+    report.developerNotes.forEach((note) => lines.push(`- ${note}`));
+    lines.push("");
+    lines.push("Recommendations");
+    report.fullRecommendations.forEach((recommendation) => lines.push(`- ${recommendation}`));
+  } else {
+    lines.push("Unlock the full report for all findings, developer notes, competitor comparison, AI Advisor, ready-to-paste fixes, and full export options.");
+  }
+
+  lines.push("");
+  lines.push("QueryCite does not guarantee AI citations, rankings, traffic, or revenue.");
+  return lines.flatMap((line) => wrapPdfLine(line));
+}
+
+function downloadReportPdf(report: WebsiteAuditReport, fullAccess?: boolean) {
+  const blob = createPdfBlob(reportPdfLines(report, fullAccess));
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  const hostname = new URL(report.finalUrl).hostname.replace(/[^a-z0-9.-]/gi, "-");
+  link.href = url;
+  link.download = fullAccess ? `querycite-${hostname}-full-report.pdf` : `querycite-${hostname}-free-report.pdf`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
 function scoreCards(report: WebsiteAuditReport): ScoreCardConfig[] {
   return [
     ["AI Visibility Score", "aiVisibility", report.scores.aiVisibility, "bg-violet-600"],
@@ -155,19 +280,29 @@ function FindingCard({ finding, index }: { finding: AuditFinding; index: number 
   );
 }
 
+function ReportDownloadButtons({ report, fullAccess, className = "" }: { report: WebsiteAuditReport; fullAccess?: boolean; className?: string }) {
+  return (
+    <div className={`grid gap-3 ${className}`}>
+      <button type="button" onClick={() => downloadReportPdf(report, fullAccess)} className="rounded-2xl border border-violet-100 bg-violet-50 p-4 text-left text-sm font-semibold text-violet-900 transition hover:border-violet-300 hover:bg-violet-100">
+        {fullAccess ? "Download full PDF report" : "Download limited free PDF"}
+      </button>
+      <button type="button" onClick={() => downloadFindingsCsv(report)} className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-left text-sm font-semibold text-emerald-800 transition hover:border-emerald-300 hover:bg-emerald-100">
+        {fullAccess ? "Download full CSV findings" : "Download basic CSV findings"}
+      </button>
+    </div>
+  );
+}
+
 function ReportActions({ report, fullAccess }: { report: WebsiteAuditReport; fullAccess?: boolean }) {
   return (
     <ClayCard>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h3 className="text-xl font-semibold text-slate-950">Report actions</h3>
-        <StatusPill tone="green">CSV works</StatusPill>
+        <StatusPill tone="green">PDF/CSV works</StatusPill>
       </div>
-      <div className="mt-5 grid gap-3">
-        <button type="button" onClick={() => downloadFindingsCsv(report)} className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-left text-sm font-semibold text-emerald-800 transition hover:border-emerald-300 hover:bg-emerald-100">
-          {fullAccess ? "Download full CSV findings" : "Download basic CSV findings"}
-        </button>
+      <ReportDownloadButtons report={report} fullAccess={fullAccess} className="mt-5" />
+      <div className="mt-3 grid gap-3">
         {[
-          ["Full PDF report", "Coming soon"],
           ["Shareable report link", "Coming soon"],
           ["Email report workflow", "Coming soon"],
         ].map(([label, status]) => (
@@ -463,6 +598,17 @@ function LeadRequiredState() {
     </main>
   );
 }
+function SavedReportLoadingState() {
+  return (
+    <main className="px-5 py-14 sm:px-8">
+      <div className="mx-auto max-w-3xl rounded-3xl border border-white/70 bg-white/85 p-8 text-center shadow-lg">
+        <StatusPill tone="violet">Loading report</StatusPill>
+        <h1 className="mt-4 text-4xl font-semibold text-slate-950">Opening your saved QueryCite report</h1>
+        <p className="mt-3 text-base leading-7 text-slate-600">Fetching the report linked from your email.</p>
+      </div>
+    </main>
+  );
+}
 function subscribeToReportStorage(callback: () => void) {
   window.addEventListener("storage", callback);
   return () => window.removeEventListener("storage", callback);
@@ -501,15 +647,49 @@ function parseStoredReport(storedReport: string) {
   }
 }
 
-export function ReportExperience({ isFullDemo }: ReportExperienceProps) {
+export function ReportExperience({ isFullDemo, reportId, subscriptionId, hasVerifiedFullAccess = false, paidPlanName = "free" }: ReportExperienceProps) {
   const storedReport = useSyncExternalStore(subscribeToReportStorage, getStoredReportSnapshot, getServerReportSnapshot);
-  const report = useMemo(() => parseStoredReport(storedReport), [storedReport]);
+  const storedReportObject = useMemo(() => parseStoredReport(storedReport), [storedReport]);
+  const leadSubmittedSnapshot = useSyncExternalStore(subscribeToLeadStorage, getLeadSubmittedSnapshot, getServerLeadSubmittedSnapshot);
+  const [remoteReport, setRemoteReport] = useState<WebsiteAuditReport | null>(null);
+  const [remoteStatus, setRemoteStatus] = useState<"idle" | "ready" | "error">("idle");
+  const hasSavedReportLink = Boolean(reportId);
+  const report = hasSavedReportLink ? remoteReport : storedReportObject;
   const topFindings = useMemo(() => report?.findings.slice(0, 3) ?? [], [report]);
   const topFixes = useMemo(() => report?.fixes.slice(0, 3) ?? [], [report]);
-  const leadSubmittedSnapshot = useSyncExternalStore(subscribeToLeadStorage, getLeadSubmittedSnapshot, getServerLeadSubmittedSnapshot);
-  const isPaidUser = false;
+  const isPaidUser = hasVerifiedFullAccess;
   const hasFullAccess = isPaidUser || isFullDemo;
-  const leadSubmitted = isFullDemo || leadSubmittedSnapshot === "true";
+  const leadSubmitted = isFullDemo || hasSavedReportLink || leadSubmittedSnapshot === "true";
+
+  useEffect(() => {
+    if (!reportId) return;
+
+    let isActive = true;
+
+    fetch(`/api/reports/${encodeURIComponent(reportId)}${subscriptionId ? `?subscription_id=${encodeURIComponent(subscriptionId)}` : ""}`)
+      .then(async (response) => {
+        const data = (await response.json()) as { report?: unknown };
+        if (!response.ok || !isWebsiteAuditReport(data.report)) {
+          throw new Error("Saved report could not be loaded.");
+        }
+        if (!isActive) return;
+        setRemoteReport(data.report);
+        setRemoteStatus("ready");
+        window.localStorage.setItem(auditStorageKey, JSON.stringify(data.report));
+      })
+      .catch(() => {
+        if (!isActive) return;
+        setRemoteStatus("error");
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [reportId, subscriptionId]);
+
+  if (hasSavedReportLink && remoteStatus !== "ready" && remoteStatus !== "error") {
+    return <SavedReportLoadingState />;
+  }
 
   if (!report) {
     return <NoReportState />;
@@ -518,7 +698,6 @@ export function ReportExperience({ isFullDemo }: ReportExperienceProps) {
   if (!hasFullAccess && !leadSubmitted) {
     return <LeadRequiredState />;
   }
-
   return (
     <main className="px-5 py-14 sm:px-8">
       <section className="mx-auto max-w-7xl">
@@ -526,7 +705,7 @@ export function ReportExperience({ isFullDemo }: ReportExperienceProps) {
 
         <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <StatusPill tone={hasFullAccess ? "violet" : "green"}>{hasFullAccess ? "Beta full report preview" : "Free report"}</StatusPill>
+            <StatusPill tone={hasFullAccess ? "violet" : "green"}>{isFullDemo ? "Beta full report preview" : hasFullAccess ? "Full report" : "Free report"}</StatusPill>
             <h1 className="mt-4 text-4xl font-semibold text-slate-950 sm:text-5xl">AI Visibility Audit Report</h1>
             <p className="mt-3 text-base text-slate-600">Website URL: {report.finalUrl}</p>
             <p className="mt-1 text-sm text-slate-500">Scanned: {new Date(report.scannedAt).toLocaleString()}</p>
@@ -557,11 +736,7 @@ export function ReportExperience({ isFullDemo }: ReportExperienceProps) {
           <div className="mt-5 grid gap-3">
             {topFixes.map((finding, index) => <FindingCard key={finding.recommendedFix} finding={finding} index={index} />)}
           </div>
-          <div className="mt-5">
-            <button type="button" onClick={() => downloadFindingsCsv(report)} className="inline-flex min-h-11 items-center justify-center rounded-full bg-emerald-700 px-5 text-sm font-semibold text-white transition hover:bg-emerald-800">
-              Download CSV findings
-            </button>
-          </div>
+          <ReportDownloadButtons report={report} fullAccess={hasFullAccess} className="mt-5" />
         </ClayCard>
       </section>
 
@@ -587,7 +762,7 @@ export function ReportExperience({ isFullDemo }: ReportExperienceProps) {
                 <h3 className="text-2xl font-semibold text-slate-950">All findings</h3>
                 <div className="mt-5 grid gap-3">{report.findings.map((finding, index) => <FindingCard key={finding.issue} finding={finding} index={index} />)}</div>
               </ClayCard>
-              <AdvisorChat currentReportData={report} planType="betaFullReport" />
+              <AdvisorChat currentReportData={report} planType={isFullDemo ? "betaFullReport" : paidPlanName} subscriptionId={subscriptionId} reportId={report.reportId ?? reportId} resetDate={null} />
             </div>
             <div className="grid gap-6 lg:grid-cols-2">
               <CompetitorSetupFoundation />
@@ -614,6 +789,9 @@ export function ReportExperience({ isFullDemo }: ReportExperienceProps) {
           <>
             <div className="mt-8 rounded-3xl border border-violet-100 bg-violet-50 p-5 text-sm font-semibold leading-6 text-violet-900">
               Free checkers show your score. QueryCite turns the score into fixes with crawler details, llms.txt guidance, schema and metadata updates, developer notes, competitor gaps, Advisor support, exports, and report history.
+            </div>
+            <div className="mt-8">
+              <AdvisorChat currentReportData={report} planType="free" />
             </div>
             <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {["Full findings", "AI Crawler Readiness details", "llms.txt generator", "Schema and metadata fixes", "Developer notes", "Competitor gaps", "AI Visibility Advisor", "Report history", "CSV/PDF exports", "Weekly tracking later"].map((section) => (

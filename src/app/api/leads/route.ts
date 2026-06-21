@@ -14,6 +14,7 @@ type LeadRequest = {
   role?: string;
   websiteUrl?: string;
   auditUrl?: string;
+  reportId?: string;
   source?: string;
   utmSource?: string;
   utmMedium?: string;
@@ -23,9 +24,23 @@ type LeadRequest = {
 };
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function compactText(value: unknown) {
   return typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
+}
+
+function getAppBaseUrl(request: Request) {
+  const configuredUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");
+  if (configuredUrl) return configuredUrl;
+
+  const host = request.headers.get("x-forwarded-host") || request.headers.get("host");
+  const protocol = request.headers.get("x-forwarded-proto") || "https";
+  return host ? `${protocol}://${host}` : "http://localhost:3000";
+}
+
+function buildReportUrl(request: Request, reportId: string) {
+  return `${getAppBaseUrl(request)}/report?reportId=${encodeURIComponent(reportId)}`;
 }
 
 export async function POST(request: Request) {
@@ -37,6 +52,8 @@ export async function POST(request: Request) {
     const role = compactText(body.role);
     const websiteUrl = normalizeWebsiteUrl(body.websiteUrl ?? "");
     const auditUrl = normalizeWebsiteUrl(body.auditUrl ?? body.websiteUrl ?? "");
+    const reportId = uuidPattern.test(compactText(body.reportId)) ? compactText(body.reportId) : null;
+    const reportUrl = reportId ? buildReportUrl(request, reportId) : `${getAppBaseUrl(request)}/report`;
 
     if (!fullName) {
       return NextResponse.json({ error: "Please enter your full name." }, { status: 400 });
@@ -68,6 +85,7 @@ export async function POST(request: Request) {
       role: role || null,
       website_url: websiteUrl,
       audit_url: auditUrl,
+      report_id: reportId,
       source: compactText(body.source) || "free_audit_gate",
       utm_source: compactText(body.utmSource) || null,
       utm_medium: compactText(body.utmMedium) || null,
@@ -83,6 +101,7 @@ export async function POST(request: Request) {
       email,
       company: companyName,
       websiteUrl,
+      reportUrl,
       marketingConsent: Boolean(body.marketingConsent),
       source: compactText(body.source) || "free_audit_gate",
     };

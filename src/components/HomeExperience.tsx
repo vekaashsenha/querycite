@@ -90,6 +90,7 @@ function LeadCaptureModal({ report, onSuccess }: { report: WebsiteAuditReport; o
           role,
           websiteUrl: report.finalUrl,
           auditUrl: report.websiteUrl,
+          reportId: report.reportId ?? "",
           source: "free_audit_gate",
           utmSource: params.get("utm_source") ?? "",
           utmMedium: params.get("utm_medium") ?? "",

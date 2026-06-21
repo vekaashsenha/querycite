@@ -87,7 +87,7 @@ The schema prepares profiles, company profiles, competitors, audits, reports, Ad
 
 - Competitor comparison UI is a beta preview until login, saved competitor setup, and competitor crawling are implemented.
 - Competitor setup fields are not saved until beta login is enabled.
-- PDF export, share report, and email report are labelled preview/coming soon.
+- Limited/free PDF download and CSV findings export work on the report page; share report and email report remain labelled preview/coming soon.
 - Dashboard, profile, and saved report history pages are backend-ready placeholders until auth is enabled.
 - Razorpay subscription code is retained for later, while pricing currently uses one-time Test Mode orders until recurring billing is approved.
 

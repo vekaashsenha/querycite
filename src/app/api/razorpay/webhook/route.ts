@@ -72,6 +72,15 @@ function emailFrom(subscription: JsonRecord, payment: JsonRecord) {
   return text(payment.email) || text(subscription.email) || text(notesFrom(subscription).email) || text(notesFrom(payment).email);
 }
 
+function getAppBaseUrl() {
+  return process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || "https://www.querycite.com";
+}
+
+function reportUrlFor(subscriptionId: string | null) {
+  const params = subscriptionId ? `?subscription_id=${encodeURIComponent(subscriptionId)}` : "";
+  return `${getAppBaseUrl()}/report${params}`;
+}
+
 function currentPeriodAllowsAccess(currentPeriodEnd: string | null) {
   return Boolean(currentPeriodEnd && Date.parse(currentPeriodEnd) > Date.now());
 }
@@ -205,6 +214,8 @@ async function sendWebhookEmails(payload: JsonRecord, eventName: string, subscri
   const planName = planNameFrom(subscription, payment);
   const subscriptionId = text(subscription.id) || text(payment.subscription_id);
   const paymentId = text(payment.id);
+  const paymentType = paymentTypeFrom(subscription, payment);
+  const hasFullReportAccess = paymentType !== "one_time_test" && Boolean(subscriptionId);
   const data = {
     email: recipient,
     planName,
@@ -213,6 +224,8 @@ async function sendWebhookEmails(payload: JsonRecord, eventName: string, subscri
     status: text(subscription.status) || text(payment.status) || eventName,
     amount: numberValue(payment.amount) ? `${numberValue(payment.amount)} ${text(payment.currency) || "INR"}` : null,
     nextBillingDate: unixSecondsToIso(subscription.charge_at),
+    reportUrl: reportUrlFor(subscriptionId),
+    hasFullReportAccess,
   };
   const emails: Array<Promise<unknown>> = [];
 

@@ -9,6 +9,7 @@ type LeadTemplateData = {
   email?: string | null;
   company?: string | null;
   websiteUrl?: string | null;
+  reportUrl?: string | null;
   marketingConsent?: boolean;
   source?: string | null;
 };
@@ -30,6 +31,8 @@ type PaymentTemplateData = {
   status?: string | null;
   amount?: string | null;
   nextBillingDate?: string | null;
+  reportUrl?: string | null;
+  hasFullReportAccess?: boolean;
 };
 
 function escapeHtml(value: unknown) {
@@ -39,6 +42,11 @@ function escapeHtml(value: unknown) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+function ctaButton(href: string | null | undefined, label: string) {
+  if (!href) return "";
+  return `<p style="margin:22px 0 8px;"><a href="${escapeHtml(href)}" style="display:inline-block;background:#0f172a;color:#ffffff;text-decoration:none;border-radius:999px;padding:13px 18px;font-size:14px;font-weight:700;">${escapeHtml(label)}</a></p>`;
 }
 
 function shell(title: string, body: string) {
@@ -52,8 +60,17 @@ function textLines(lines: Array<string | null | undefined>) {
 export function leadCapturedUserTemplate(data: LeadTemplateData): EmailTemplate {
   const subject = "Your QueryCite AI Visibility Report";
   const title = "Your free AI Visibility Report is ready";
-  const html = shell(title, `<p>Hi ${escapeHtml(data.name || "there")},</p><p>Your QueryCite free audit report for <strong>${escapeHtml(data.websiteUrl)}</strong> is ready in your current browser session.</p><p>This free report includes basic scores, top findings, and limited export options.</p>`);
-  const text = textLines([`Hi ${data.name || "there"},`, `Your QueryCite free audit report for ${data.websiteUrl || "your website"} is ready in your current browser session.`, "This free report includes basic scores, top findings, and limited export options."]);
+  const reportUrl = data.reportUrl ?? null;
+  const html = shell(
+    title,
+    `<p>Hi ${escapeHtml(data.name || "there")},</p><p>Your free AI Visibility Report for <strong>${escapeHtml(data.websiteUrl || "your website")}</strong> is ready. You can view it online and download your limited PDF report.</p><p>This free report includes basic scores, top findings, and limited export options.</p>${ctaButton(reportUrl, "View & Download Free Report")}`,
+  );
+  const text = textLines([
+    `Hi ${data.name || "there"},`,
+    `Your free AI Visibility Report for ${data.websiteUrl || "your website"} is ready. You can view it online and download your limited PDF report.`,
+    "This free report includes basic scores, top findings, and limited export options.",
+    reportUrl ? `View & Download Free Report: ${reportUrl}` : null,
+  ]);
   return { subject, html, text };
 }
 
@@ -65,6 +82,7 @@ export function leadCapturedAdminTemplate(data: LeadTemplateData): EmailTemplate
     ["Email", data.email],
     ["Company", data.company],
     ["Website", data.websiteUrl],
+    ["Report URL", data.reportUrl],
     ["Marketing consent", data.marketingConsent ? "Yes" : "No"],
     ["Source", data.source],
   ];
@@ -99,9 +117,17 @@ export function feedbackReceivedAdminTemplate(data: FeedbackTemplateData): Email
 
 export function paymentSuccessUserTemplate(data: PaymentTemplateData): EmailTemplate {
   const subject = "QueryCite payment received";
-  const title = "Payment test received";
-  const html = shell(title, `<p>We received a QueryCite payment event in test mode.</p><p><strong>Plan:</strong> ${escapeHtml(data.planName || "-")}<br/><strong>Payment ID:</strong> ${escapeHtml(data.paymentId || "-")}</p><p>Paid access is confirmed only after verified webhook processing.</p>`);
-  const text = textLines(["We received a QueryCite payment event in test mode.", `Plan: ${data.planName || "-"}`, `Payment ID: ${data.paymentId || "-"}`, "Paid access is confirmed only after verified webhook processing."]);
+  const title = data.hasFullReportAccess ? "Your full report access is ready" : "Payment test received";
+  const accessCopy = data.hasFullReportAccess
+    ? "Your payment was verified for full report access. You can view the report online and download the full PDF when opening the protected report page."
+    : "This payment test validates checkout, webhook, Supabase records, and email flow. It does not unlock long-term full report access.";
+  const html = shell(title, `<p>${escapeHtml(accessCopy)}</p><p><strong>Plan:</strong> ${escapeHtml(data.planName || "-")}<br/><strong>Payment ID:</strong> ${escapeHtml(data.paymentId || "-")}</p>${data.hasFullReportAccess ? ctaButton(data.reportUrl, "View & Download Full Report") : ""}`);
+  const text = textLines([
+    accessCopy,
+    `Plan: ${data.planName || "-"}`,
+    `Payment ID: ${data.paymentId || "-"}`,
+    data.hasFullReportAccess && data.reportUrl ? `View & Download Full Report: ${data.reportUrl}` : null,
+  ]);
   return { subject, html, text };
 }
 
@@ -116,8 +142,8 @@ export function paymentFailedUserTemplate(data: PaymentTemplateData): EmailTempl
 export function subscriptionActiveUserTemplate(data: PaymentTemplateData): EmailTemplate {
   const subject = "Your QueryCite subscription is active";
   const title = "Subscription test status is active";
-  const html = shell(title, `<p>Your QueryCite subscription event was verified in test mode.</p><p><strong>Plan:</strong> ${escapeHtml(data.planName || "-")}<br/><strong>Subscription ID:</strong> ${escapeHtml(data.subscriptionId || "-")}<br/><strong>Next billing date:</strong> ${escapeHtml(data.nextBillingDate || "-")}</p>`);
-  const text = textLines(["Your QueryCite subscription event was verified in test mode.", `Plan: ${data.planName || "-"}`, `Subscription ID: ${data.subscriptionId || "-"}`, `Next billing date: ${data.nextBillingDate || "-"}`]);
+  const html = shell(title, `<p>Your QueryCite subscription event was verified in test mode.</p><p><strong>Plan:</strong> ${escapeHtml(data.planName || "-")}<br/><strong>Subscription ID:</strong> ${escapeHtml(data.subscriptionId || "-")}<br/><strong>Next billing date:</strong> ${escapeHtml(data.nextBillingDate || "-")}</p>${ctaButton(data.reportUrl, "View & Download Full Report")}`);
+  const text = textLines(["Your QueryCite subscription event was verified in test mode.", `Plan: ${data.planName || "-"}`, `Subscription ID: ${data.subscriptionId || "-"}`, `Next billing date: ${data.nextBillingDate || "-"}`, data.reportUrl ? `View & Download Full Report: ${data.reportUrl}` : null]);
   return { subject, html, text };
 }
 
