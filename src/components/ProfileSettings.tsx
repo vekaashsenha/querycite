@@ -82,8 +82,8 @@ export function ProfileSettings({ subscriptionId, email, planName }: ProfileSett
     async function loadSettings() {
       try {
         const [profileResponse, competitorsResponse] = await Promise.all([
-          fetch(`/api/profile?subscription_id=${encodeURIComponent(subscriptionId)}`),
-          fetch(`/api/competitors?subscription_id=${encodeURIComponent(subscriptionId)}`),
+          fetch("/api/profile"),
+          fetch("/api/competitors"),
         ]);
         const profileData = (await profileResponse.json()) as { profile?: Record<string, unknown>; error?: string };
         const competitorData = (await competitorsResponse.json()) as CompetitorResponse;
@@ -157,7 +157,7 @@ export function ProfileSettings({ subscriptionId, email, planName }: ProfileSett
       const profileResponse = await fetch("/api/profile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subscription_id: subscriptionId, ...profile }),
+        body: JSON.stringify(profile),
       });
       const profileData = (await profileResponse.json()) as { error?: string };
       if (!profileResponse.ok) throw new Error(profileData.error || "Profile could not be saved.");
@@ -166,7 +166,7 @@ export function ProfileSettings({ subscriptionId, email, planName }: ProfileSett
       const competitorResponse = await fetch("/api/competitors", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subscription_id: subscriptionId, competitors: competitorPayload }),
+        body: JSON.stringify({ competitors: competitorPayload }),
       });
       const competitorData = (await competitorResponse.json()) as CompetitorResponse;
       if (!competitorResponse.ok) throw new Error(competitorData.error || "Competitors could not be saved.");

@@ -76,9 +76,8 @@ function getAppBaseUrl() {
   return process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || "https://www.querycite.com";
 }
 
-function reportUrlFor(subscriptionId: string | null) {
-  const params = subscriptionId ? `?subscription_id=${encodeURIComponent(subscriptionId)}` : "";
-  return `${getAppBaseUrl()}/report${params}`;
+function reportUrlFor() {
+  return `${getAppBaseUrl()}/dashboard`;
 }
 
 function currentPeriodAllowsAccess(currentPeriodEnd: string | null) {
@@ -224,7 +223,7 @@ async function sendWebhookEmails(payload: JsonRecord, eventName: string, subscri
     status: text(subscription.status) || text(payment.status) || eventName,
     amount: numberValue(payment.amount) ? `${numberValue(payment.amount)} ${text(payment.currency) || "INR"}` : null,
     nextBillingDate: unixSecondsToIso(subscription.charge_at),
-    reportUrl: reportUrlFor(subscriptionId),
+    reportUrl: reportUrlFor(),
     hasFullReportAccess,
   };
   const emails: Array<Promise<unknown>> = [];

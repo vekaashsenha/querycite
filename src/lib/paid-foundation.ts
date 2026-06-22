@@ -2,9 +2,11 @@ import { normalizeWebsiteUrl } from "@/lib/url";
 import { normalizePaidPlanName, planLimits, type PaidPlanName, type PlanLimits } from "@/lib/plans";
 import { isSupabaseAdminConfigured, selectSupabaseRows } from "@/lib/supabase/admin";
 import type { AuditFinding, WebsiteAuditReport } from "@/lib/audit-report";
+import type { QueryCiteUser } from "@/lib/auth/server";
 
 type SubscriptionRow = {
   id?: string | null;
+  user_id?: string | null;
   email?: string | null;
   plan_name?: string | null;
   status?: string | null;
@@ -26,6 +28,8 @@ export type DashboardReport = {
   createdAt: string;
   reportType: string;
   aiVisibilityScore: number;
+  aeoScore: number;
+  geoScore: number;
   aiCrawlerReadinessScore: number;
   findings: AuditFinding[];
   fullReportData: WebsiteAuditReport | null;
@@ -49,6 +53,7 @@ export type PaidAccessContext = {
   verifiedPaidAccess: boolean;
   subscriptionId: string | null;
   subscriptionRowId: string | null;
+  userId: string | null;
   email: string | null;
   planName: PaidPlanName;
   rawPlanName: string | null;
@@ -71,13 +76,14 @@ function rowAllowsPaidAccess(row: SubscriptionRow | undefined) {
   return false;
 }
 
-function emptyContext(subscriptionId?: string | null): PaidAccessContext {
+function emptyContext(subscriptionId?: string | null, user?: QueryCiteUser | null): PaidAccessContext {
   return {
     isConfigured: isSupabaseAdminConfigured(),
     verifiedPaidAccess: false,
     subscriptionId: subscriptionId ?? null,
     subscriptionRowId: null,
-    email: null,
+    userId: user?.id ?? null,
+    email: user?.email ?? null,
     planName: "free",
     rawPlanName: null,
     status: isSupabaseAdminConfigured() ? "unpaid" : "unavailable",
@@ -89,27 +95,20 @@ function emptyContext(subscriptionId?: string | null): PaidAccessContext {
   };
 }
 
-export async function getPaidAccessContext(subscriptionId?: string | null): Promise<PaidAccessContext> {
-  if (!subscriptionId || !isSupabaseAdminConfigured()) return emptyContext(subscriptionId);
-
-  const rows = await selectSupabaseRows<SubscriptionRow>("subscriptions", {
-    select: "id,email,plan_name,status,paid_access,website_url,current_period_start,current_period_end,next_billing_date,renewal_date,razorpay_subscription_id,provider_subscription_id,provider_customer_id",
-    razorpay_subscription_id: `eq.${subscriptionId}`,
-    order: "updated_at.desc",
-    limit: "1",
-  });
-  const row = rows[0];
-  if (!row) return emptyContext(subscriptionId);
+function contextFromRow(row: SubscriptionRow | undefined, fallbackSubscriptionId?: string | null, user?: QueryCiteUser | null): PaidAccessContext {
+  if (!row) return emptyContext(fallbackSubscriptionId, user);
 
   const planName = normalizePaidPlanName(row.plan_name);
   const verifiedPaidAccess = rowAllowsPaidAccess(row);
+  const subscriptionId = row.razorpay_subscription_id || row.provider_subscription_id || fallbackSubscriptionId || null;
 
   return {
     isConfigured: true,
     verifiedPaidAccess,
     subscriptionId,
     subscriptionRowId: row.id ?? null,
-    email: row.email ?? null,
+    userId: row.user_id ?? user?.id ?? null,
+    email: row.email ?? user?.email ?? null,
     planName: verifiedPaidAccess ? planName : "free",
     rawPlanName: row.plan_name ?? null,
     status: verifiedPaidAccess ? "active" : row.status || "unpaid",
@@ -119,6 +118,34 @@ export async function getPaidAccessContext(subscriptionId?: string | null): Prom
     renewalDate: row.next_billing_date ?? row.renewal_date ?? row.current_period_end ?? null,
     limits: verifiedPaidAccess ? planLimits[planName] : planLimits.free,
   };
+}
+
+const subscriptionSelect = "id,user_id,email,plan_name,status,paid_access,website_url,current_period_start,current_period_end,next_billing_date,renewal_date,razorpay_subscription_id,provider_subscription_id,provider_customer_id";
+
+export async function getPaidAccessContext(subscriptionId?: string | null): Promise<PaidAccessContext> {
+  if (!subscriptionId || !isSupabaseAdminConfigured()) return emptyContext(subscriptionId);
+
+  const rows = await selectSupabaseRows<SubscriptionRow>("subscriptions", {
+    select: subscriptionSelect,
+    razorpay_subscription_id: `eq.${subscriptionId}`,
+    order: "updated_at.desc",
+    limit: "1",
+  });
+
+  return contextFromRow(rows[0], subscriptionId);
+}
+
+export async function getPaidAccessContextForUser(user: QueryCiteUser | null): Promise<PaidAccessContext> {
+  if (!user || !isSupabaseAdminConfigured()) return emptyContext(null, user);
+
+  const rows = await selectSupabaseRows<SubscriptionRow>("subscriptions", {
+    select: subscriptionSelect,
+    or: `(user_id.eq.${user.id},email.eq.${user.email})`,
+    order: "updated_at.desc",
+    limit: "1",
+  });
+
+  return contextFromRow(rows[0], rows[0]?.razorpay_subscription_id || rows[0]?.provider_subscription_id || null, user);
 }
 
 function numberOrZero(value: unknown) {
@@ -141,11 +168,43 @@ type ReportRow = {
   final_url?: string | null;
   report_type?: string | null;
   ai_visibility_score?: number | null;
+  aeo_score?: number | null;
+  geo_score?: number | null;
   ai_crawler_readiness_score?: number | null;
   findings?: unknown;
   full_report_data?: unknown;
   created_at?: string | null;
 };
+
+function mapReport(row: ReportRow): DashboardReport | null {
+  if (!row.id || !row.website_url) return null;
+  return {
+    id: row.id,
+    websiteUrl: row.website_url,
+    finalUrl: row.final_url ?? null,
+    createdAt: row.created_at ?? new Date().toISOString(),
+    reportType: row.report_type ?? "free",
+    aiVisibilityScore: numberOrZero(row.ai_visibility_score),
+    aeoScore: numberOrZero(row.aeo_score),
+    geoScore: numberOrZero(row.geo_score),
+    aiCrawlerReadinessScore: numberOrZero(row.ai_crawler_readiness_score),
+    findings: toFindings(row.findings).slice(0, 3),
+    fullReportData: toWebsiteAuditReport(row.full_report_data),
+  };
+}
+
+export async function getReportsForAuthenticatedUser(user: QueryCiteUser): Promise<DashboardReport[]> {
+  if (!isSupabaseAdminConfigured()) return [];
+
+  const rows = await selectSupabaseRows<ReportRow>("reports", {
+    select: "id,website_url,final_url,report_type,ai_visibility_score,aeo_score,geo_score,ai_crawler_readiness_score,findings,full_report_data,created_at",
+    user_id: `eq.${user.id}`,
+    order: "created_at.desc",
+    limit: "50",
+  });
+
+  return rows.map(mapReport).filter((report): report is DashboardReport => Boolean(report));
+}
 
 export async function getReportsForPaidContext(context: PaidAccessContext): Promise<DashboardReport[]> {
   if (!context.verifiedPaidAccess || !context.websiteUrl || !isSupabaseAdminConfigured()) return [];
@@ -153,25 +212,13 @@ export async function getReportsForPaidContext(context: PaidAccessContext): Prom
   if (!normalizedWebsite) return [];
 
   const rows = await selectSupabaseRows<ReportRow>("reports", {
-    select: "id,website_url,final_url,report_type,ai_visibility_score,ai_crawler_readiness_score,findings,full_report_data,created_at",
+    select: "id,website_url,final_url,report_type,ai_visibility_score,aeo_score,geo_score,ai_crawler_readiness_score,findings,full_report_data,created_at",
     website_url: `eq.${normalizedWebsite}`,
     order: "created_at.desc",
     limit: "25",
   });
 
-  return rows
-    .filter((row) => row.id && row.website_url)
-    .map((row) => ({
-      id: row.id as string,
-      websiteUrl: row.website_url as string,
-      finalUrl: row.final_url ?? null,
-      createdAt: row.created_at ?? new Date().toISOString(),
-      reportType: row.report_type ?? "free",
-      aiVisibilityScore: numberOrZero(row.ai_visibility_score),
-      aiCrawlerReadinessScore: numberOrZero(row.ai_crawler_readiness_score),
-      findings: toFindings(row.findings).slice(0, 3),
-      fullReportData: toWebsiteAuditReport(row.full_report_data),
-    }));
+  return rows.map(mapReport).filter((report): report is DashboardReport => Boolean(report));
 }
 
 type PaymentRow = {
@@ -188,17 +235,8 @@ type PaymentRow = {
   created_at?: string | null;
 };
 
-export async function getPaymentHistoryForPaidContext(context: PaidAccessContext): Promise<PaymentHistoryItem[]> {
-  if (!context.subscriptionId || !isSupabaseAdminConfigured()) return [];
-
-  const rows = await selectSupabaseRows<PaymentRow>("payments", {
-    select: "id,amount,amount_cents,currency,status,payment_type,plan_name,razorpay_payment_id,razorpay_order_id,provider_invoice_id,created_at",
-    razorpay_subscription_id: `eq.${context.subscriptionId}`,
-    order: "created_at.desc",
-    limit: "20",
-  });
-
-  return rows.map((row) => ({
+function mapPayment(row: PaymentRow): PaymentHistoryItem {
+  return {
     id: row.id ?? `${row.razorpay_payment_id ?? "payment"}-${row.created_at ?? ""}`,
     amount: row.amount ?? row.amount_cents ?? null,
     currency: row.currency ?? "INR",
@@ -209,7 +247,33 @@ export async function getPaymentHistoryForPaidContext(context: PaidAccessContext
     razorpayOrderId: row.razorpay_order_id ?? null,
     providerInvoiceId: row.provider_invoice_id ?? null,
     createdAt: row.created_at ?? new Date().toISOString(),
-  }));
+  };
+}
+
+export async function getPaymentHistoryForPaidContext(context: PaidAccessContext): Promise<PaymentHistoryItem[]> {
+  if (!context.subscriptionId || !isSupabaseAdminConfigured()) return [];
+
+  const rows = await selectSupabaseRows<PaymentRow>("payments", {
+    select: "id,amount,amount_cents,currency,status,payment_type,plan_name,razorpay_payment_id,razorpay_order_id,provider_invoice_id,created_at",
+    razorpay_subscription_id: `eq.${context.subscriptionId}`,
+    order: "created_at.desc",
+    limit: "20",
+  });
+
+  return rows.map(mapPayment);
+}
+
+export async function getPaymentHistoryForUser(user: QueryCiteUser): Promise<PaymentHistoryItem[]> {
+  if (!isSupabaseAdminConfigured()) return [];
+
+  const rows = await selectSupabaseRows<PaymentRow>("payments", {
+    select: "id,amount,amount_cents,currency,status,payment_type,plan_name,razorpay_payment_id,razorpay_order_id,provider_invoice_id,created_at",
+    or: `(user_id.eq.${user.id},email.eq.${user.email})`,
+    order: "created_at.desc",
+    limit: "20",
+  });
+
+  return rows.map(mapPayment);
 }
 
 export function formatPaise(amount: number | null, currency = "INR") {

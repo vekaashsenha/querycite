@@ -32,8 +32,8 @@ export default async function PaymentSuccessPage({ searchParams }: PaymentSucces
             : "This page does not activate paid access by itself. QueryCite uses verified Razorpay webhooks and Supabase subscription status as the source of truth."}
         </p>
         <div className="mt-7 flex flex-wrap justify-center gap-3">
-          <PrimaryLink href="/report?demo=full">View Full Report</PrimaryLink>
-          <Link href="/dashboard" className="inline-flex min-h-12 items-center justify-center rounded-full border border-slate-300 bg-white px-6 text-sm font-semibold text-slate-900 transition hover:border-slate-950">Go to Dashboard</Link>
+          <PrimaryLink href="/dashboard">Go to Dashboard</PrimaryLink>
+          <Link href="/report" className="inline-flex min-h-12 items-center justify-center rounded-full border border-slate-300 bg-white px-6 text-sm font-semibold text-slate-900 transition hover:border-slate-950">Open latest free report</Link>
         </div>
       </ClayCard>
     </main>

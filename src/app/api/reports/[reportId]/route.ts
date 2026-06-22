@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { isWebsiteAuditReport, type WebsiteAuditReport } from "@/lib/audit-report";
-import { getPaidAccessContext } from "@/lib/paid-foundation";
-import { normalizeWebsiteUrl } from "@/lib/url";
+import { getPaidAccessContextForUser } from "@/lib/paid-foundation";
+import { getCurrentUser, syncAuthenticatedUser } from "@/lib/auth/server";
 import { isSupabaseAdminConfigured, selectSupabaseRows } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -9,6 +9,7 @@ export const runtime = "nodejs";
 type SavedReportRow = {
   id?: string | null;
   audit_id?: string | null;
+  user_id?: string | null;
   report_type?: string | null;
   website_url?: string | null;
   full_report_data?: unknown;
@@ -39,13 +40,7 @@ function toFullReport(report: WebsiteAuditReport, row: SavedReportRow): WebsiteA
   };
 }
 
-function sameWebsite(a: string | null | undefined, b: string | null | undefined) {
-  const first = normalizeWebsiteUrl(a || "");
-  const second = normalizeWebsiteUrl(b || "");
-  return Boolean(first && second && first === second);
-}
-
-export async function GET(request: Request, context: { params: Promise<{ reportId: string }> }) {
+export async function GET(_request: Request, context: { params: Promise<{ reportId: string }> }) {
   const { reportId } = await context.params;
 
   if (!uuidPattern.test(reportId)) {
@@ -58,7 +53,7 @@ export async function GET(request: Request, context: { params: Promise<{ reportI
 
   try {
     const rows = await selectSupabaseRows<SavedReportRow>("reports", {
-      select: "id,audit_id,report_type,website_url,full_report_data",
+      select: "id,audit_id,user_id,report_type,website_url,full_report_data",
       id: `eq.${reportId}`,
       limit: "1",
     });
@@ -68,9 +63,13 @@ export async function GET(request: Request, context: { params: Promise<{ reportI
       return NextResponse.json({ error: "Report not found." }, { status: 404 });
     }
 
-    const subscriptionId = new URL(request.url).searchParams.get("subscription_id");
-    const access = subscriptionId ? await getPaidAccessContext(subscriptionId) : null;
-    const canReturnFull = Boolean(access?.verifiedPaidAccess && sameWebsite(row.website_url, access.websiteUrl));
+    const user = await getCurrentUser();
+    let canReturnFull = false;
+    if (user) {
+      await syncAuthenticatedUser(user);
+      const access = await getPaidAccessContextForUser(user);
+      canReturnFull = Boolean(access.verifiedPaidAccess && row.user_id === user.id);
+    }
 
     return NextResponse.json({
       report: canReturnFull ? toFullReport(row.full_report_data, row) : toFreeReport(row.full_report_data, row),

@@ -71,6 +71,22 @@ To apply it:
 5. Confirm RLS is enabled on all QueryCite tables.
 
 The schema prepares profiles, company profiles, competitors, audits, reports, Advisor messages, credit usage, feedback, exports, subscriptions, payments, and Razorpay Test Mode webhook storage.
+## Supabase Auth
+
+QueryCite uses Supabase Auth email/password for `/signup`, `/login`, `/auth/callback`, and logout. Email confirmation should remain enabled in Supabase.
+
+Configured redirect URLs should include:
+
+```bash
+https://www.querycite.com/auth/callback
+https://www.querycite.com/login
+https://www.querycite.com/dashboard
+http://localhost:3000/auth/callback
+http://localhost:3000/login
+http://localhost:3000/dashboard
+```
+
+Authenticated users are mapped to `profiles`, previous lead/report rows by matching email, and verified subscription/payment rows by `user_id` or email. Free report links with `reportId` remain viewable without login, but dashboard, profile, billing, competitor management, full downloads, and paid Advisor access require login plus verified paid access.
 
 ## What Works Now
 
@@ -86,9 +102,9 @@ The schema prepares profiles, company profiles, competitors, audits, reports, Ad
 ## Beta Preview / Coming Soon
 
 - Competitor comparison UI is a beta preview until login, saved competitor setup, and competitor crawling are implemented.
-- Competitor setup fields are not saved until beta login is enabled.
+- Supabase email/password login is enabled for dashboard, profile, billing, saved reports, paid competitor setup, and paid Advisor access.
 - Limited/free PDF download and CSV findings export work on the report page; share report and email report remain labelled preview/coming soon.
-- Dashboard, profile, and saved report history pages are backend-ready placeholders until auth is enabled.
+- Dashboard, profile, billing, and saved report history require login. Free saved report links still open limited reports without login.
 - Razorpay subscription code is retained for later, while pricing currently uses one-time Test Mode orders until recurring billing is approved.
 
 ## AI Visibility Advisor
@@ -145,7 +161,6 @@ Verify email sending by submitting the lead form or contact form with Resend env
 ## Before Live Payment Launch
 
 - Switch Razorpay keys from Test Mode to Live Mode only after subscription testing is complete.
-- Add authentication and account mapping.
 - Use verified subscription status for full report access.
 - Add customer-facing billing management and cancellation flows.
 - Finalize billing, refund, and subscription policy pages.

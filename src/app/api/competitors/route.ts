@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getPaidAccessContext } from "@/lib/paid-foundation";
+import { getPaidAccessContextForUser } from "@/lib/paid-foundation";
+import { getCurrentUser, syncAuthenticatedUser } from "@/lib/auth/server";
 import { insertSupabaseRow, isSupabaseAdminConfigured, selectSupabaseRows, updateSupabaseRows } from "@/lib/supabase/admin";
 import { normalizeWebsiteUrl } from "@/lib/url";
 
@@ -13,11 +14,10 @@ type CompetitorInput = {
 };
 
 type CompetitorsRequest = {
-  subscription_id?: string;
   competitors?: CompetitorInput[];
 };
 
-type CompanyProfileRow = { id?: string; subscription_id?: string | null; website_url?: string | null; primary_domain?: string | null };
+type CompanyProfileRow = { id?: string; subscription_id?: string | null; website_url?: string | null; primary_domain?: string | null; owner_user_id?: string | null };
 type CompetitorRow = Record<string, unknown> & { id?: string; slot_number?: number; competitor_url?: string | null; is_active?: boolean | null };
 type LimitRow = Record<string, unknown> & { id?: string; change_count?: number | null; billing_cycle_start?: string | null; billing_cycle_end?: string | null };
 
@@ -41,22 +41,37 @@ function periodEnd(accessEnd: string | null) {
   return accessEnd || new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString();
 }
 
-async function getCompanyProfile(subscriptionId: string) {
+async function authenticatedAccess() {
+  const user = await getCurrentUser();
+  if (!user) return { error: NextResponse.json({ error: "Please log in to continue." }, { status: 401 }) };
+  await syncAuthenticatedUser(user);
+  const access = await getPaidAccessContextForUser(user);
+  if (!access.verifiedPaidAccess || !access.subscriptionId) return { error: NextResponse.json({ error: "Verified paid access is required to manage competitors." }, { status: 403 }) };
+  if (!isSupabaseAdminConfigured()) return { error: NextResponse.json({ error: "Competitor storage is temporarily unavailable." }, { status: 503 }) };
+  return { user, access };
+}
+
+async function getCompanyProfile(userId: string, subscriptionId: string) {
   const rows = await selectSupabaseRows<CompanyProfileRow>("company_profiles", {
-    select: "id,subscription_id,website_url,primary_domain",
-    subscription_id: `eq.${subscriptionId}`,
+    select: "id,subscription_id,website_url,primary_domain,owner_user_id",
+    or: `(owner_user_id.eq.${userId},subscription_id.eq.${subscriptionId})`,
     limit: "1",
   });
   return rows[0] ?? null;
 }
 
-async function ensureCompanyProfile(subscriptionId: string, email: string | null, websiteUrl: string | null) {
-  const existing = await getCompanyProfile(subscriptionId);
-  if (existing?.id) return existing;
+async function ensureCompanyProfile(userId: string, subscriptionId: string, email: string | null, websiteUrl: string | null) {
+  const existing = await getCompanyProfile(userId, subscriptionId);
+  if (existing?.id) {
+    if (existing.owner_user_id !== userId) {
+      await updateSupabaseRows("company_profiles", { id: `eq.${existing.id}` }, { owner_user_id: userId, email, subscription_id: subscriptionId, updated_at: new Date().toISOString() });
+    }
+    return existing;
+  }
 
   const normalized = normalizeWebsiteUrl(websiteUrl || "") || "https://example.com";
   const inserted = await insertSupabaseRow("company_profiles", {
-    owner_user_id: null,
+    owner_user_id: userId,
     email,
     subscription_id: subscriptionId,
     company_name: null,
@@ -68,22 +83,22 @@ async function ensureCompanyProfile(subscriptionId: string, email: string | null
   return inserted[0] as CompanyProfileRow;
 }
 
-async function getCompetitors(subscriptionId: string) {
+async function getCompetitors(userId: string, subscriptionId: string) {
   return selectSupabaseRows<CompetitorRow>("competitors", {
     select: "id,competitor_name,competitor_url,domain,competitor_type,slot_number,is_active,created_at,updated_at",
-    subscription_id: `eq.${subscriptionId}`,
+    or: `(user_id.eq.${userId},subscription_id.eq.${subscriptionId})`,
     is_active: "eq.true",
     order: "slot_number.asc",
     limit: "10",
   });
 }
 
-async function getOrCreateLimit(subscriptionId: string, access: Awaited<ReturnType<typeof getPaidAccessContext>>, companyProfileId: string) {
+async function getOrCreateLimit(userId: string, subscriptionId: string, access: Awaited<ReturnType<typeof getPaidAccessContextForUser>>, companyProfileId: string) {
   const start = periodStart(access.currentPeriodStart);
   const end = periodEnd(access.currentPeriodEnd);
   const existingRows = await selectSupabaseRows<LimitRow>("competitor_change_limits", {
     select: "*",
-    subscription_id: `eq.${subscriptionId}`,
+    or: `(user_id.eq.${userId},subscription_id.eq.${subscriptionId})`,
     limit: "1",
   });
   const existing = existingRows[0];
@@ -93,6 +108,7 @@ async function getOrCreateLimit(subscriptionId: string, access: Awaited<ReturnTy
     const nextStart = Date.parse(start);
     if (nextStart > existingStart) {
       const updated = await updateSupabaseRows("competitor_change_limits", { id: `eq.${existing.id}` }, {
+        user_id: userId,
         billing_cycle_start: start,
         billing_cycle_end: end,
         change_count: 0,
@@ -107,7 +123,7 @@ async function getOrCreateLimit(subscriptionId: string, access: Awaited<ReturnTy
 
   const inserted = await insertSupabaseRow("competitor_change_limits", {
     company_profile_id: companyProfileId,
-    user_id: null,
+    user_id: userId,
     email: access.email,
     subscription_id: subscriptionId,
     billing_cycle_start: start,
@@ -133,22 +149,14 @@ function normalizeCompetitor(input: CompetitorInput) {
   };
 }
 
-export async function GET(request: Request) {
-  const url = new URL(request.url);
-  const subscriptionId = clean(url.searchParams.get("subscription_id"));
-  const access = await getPaidAccessContext(subscriptionId);
-
-  if (!access.verifiedPaidAccess) {
-    return NextResponse.json({ error: "Verified paid access is required to manage competitors." }, { status: 403 });
-  }
-
-  if (!isSupabaseAdminConfigured()) {
-    return NextResponse.json({ error: "Competitor storage is temporarily unavailable." }, { status: 503 });
-  }
-
-  const companyProfile = await ensureCompanyProfile(subscriptionId, access.email, access.websiteUrl);
-  const limit = await getOrCreateLimit(subscriptionId, access, companyProfile.id as string);
-  const competitors = await getCompetitors(subscriptionId);
+export async function GET() {
+  const auth = await authenticatedAccess();
+  if (auth.error) return auth.error;
+  const { user, access } = auth;
+  const subscriptionId = access.subscriptionId as string;
+  const companyProfile = await ensureCompanyProfile(user.id, subscriptionId, access.email ?? user.email, access.websiteUrl);
+  const limit = await getOrCreateLimit(user.id, subscriptionId, access, companyProfile.id as string);
+  const competitors = await getCompetitors(user.id, subscriptionId);
 
   return NextResponse.json({
     competitors,
@@ -162,26 +170,20 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const auth = await authenticatedAccess();
+    if (auth.error) return auth.error;
+    const { user, access } = auth;
+    const subscriptionId = access.subscriptionId as string;
     const body = (await request.json()) as CompetitorsRequest;
-    const subscriptionId = clean(body.subscription_id);
-    const access = await getPaidAccessContext(subscriptionId);
-
-    if (!access.verifiedPaidAccess) {
-      return NextResponse.json({ error: "Verified paid access is required to save competitors." }, { status: 403 });
-    }
-
-    if (!isSupabaseAdminConfigured()) {
-      return NextResponse.json({ error: "Competitor storage is temporarily unavailable." }, { status: 503 });
-    }
-
     const incoming = (body.competitors || []).map(normalizeCompetitor).filter(Boolean) as Array<ReturnType<typeof normalizeCompetitor> & Record<string, unknown>>;
+
     if (incoming.length > 3) {
       return NextResponse.json({ error: "MVP competitor setup allows up to 3 competitors." }, { status: 400 });
     }
 
-    const companyProfile = await ensureCompanyProfile(subscriptionId, access.email, access.websiteUrl);
-    const existingCompetitors = await getCompetitors(subscriptionId);
-    const limit = await getOrCreateLimit(subscriptionId, access, companyProfile.id as string);
+    const companyProfile = await ensureCompanyProfile(user.id, subscriptionId, access.email ?? user.email, access.websiteUrl);
+    const existingCompetitors = await getCompetitors(user.id, subscriptionId);
+    const limit = await getOrCreateLimit(user.id, subscriptionId, access, companyProfile.id as string);
     const changesUsed = limit.change_count ?? 0;
     const changeLimit = (limit.change_limit as number | null) ?? access.limits.competitorChanges;
 
@@ -199,8 +201,8 @@ export async function POST(request: Request) {
       const existing = existingCompetitors.find((row) => row.slot_number === item.slot_number);
       const row = {
         company_profile_id: companyProfile.id,
-        user_id: null,
-        email: access.email,
+        user_id: user.id,
+        email: access.email ?? user.email,
         subscription_id: subscriptionId,
         is_active: true,
         updated_at: now,
@@ -216,6 +218,7 @@ export async function POST(request: Request) {
 
     if (changed.length > 0 && limit.id) {
       await updateSupabaseRows("competitor_change_limits", { id: `eq.${limit.id}` }, {
+        user_id: user.id,
         change_count: changesUsed + changed.length,
         change_limit: changeLimit,
         reset_date: limit.reset_date ?? periodEnd(access.currentPeriodEnd),
@@ -223,7 +226,7 @@ export async function POST(request: Request) {
       });
     }
 
-    const competitors = await getCompetitors(subscriptionId);
+    const competitors = await getCompetitors(user.id, subscriptionId);
     return NextResponse.json({
       competitors,
       changeLimit,

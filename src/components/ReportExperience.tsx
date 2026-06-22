@@ -522,7 +522,7 @@ function CompetitorSetupFoundation() {
         <h3 className="text-xl font-semibold text-slate-950">Competitor setup</h3>
         <StatusPill tone="amber">Login required to save</StatusPill>
       </div>
-      <p className="mt-2 text-sm leading-6 text-slate-600">Add competitors now for beta review. Saved competitor setup will be enabled after login is connected.</p>
+      <p className="mt-2 text-sm leading-6 text-slate-600">Competitor setup is saved from the Profile area after login and verified paid access.</p>
       <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-slate-600">
         <span className="rounded-full bg-slate-100 px-3 py-1">0/3 competitors added</span>
         <span className="rounded-full bg-slate-100 px-3 py-1">0/3 changes used this cycle</span>
@@ -541,7 +541,7 @@ function CompetitorSetupFoundation() {
         ))}
       </div>
       <button type="button" disabled className="mt-5 min-h-11 rounded-full bg-slate-300 px-5 text-sm font-semibold text-white">
-        Save competitors after beta login is enabled
+        Save competitors from Profile
       </button>
       <p className="mt-3 rounded-2xl border border-amber-100 bg-amber-50 p-4 text-xs font-semibold leading-5 text-amber-900">
         Competitor changes are expected to be limited to 3 per billing cycle once login and billing are active.
@@ -557,7 +557,7 @@ function CompetitorComparisonPreview() {
         <h3 className="text-xl font-semibold text-slate-950">Competitor comparison beta preview</h3>
         <StatusPill tone="amber">Beta preview</StatusPill>
       </div>
-      <p className="mt-2 text-sm leading-6 text-slate-600">Competitor comparison beta preview. Add competitors now. Full crawling and scoring will be enabled after login and saved competitor setup.</p>
+      <p className="mt-2 text-sm leading-6 text-slate-600">Competitor comparison beta preview. Saved competitor setup is available in Profile for accounts with verified paid access. Full crawling and scoring will be connected later.</p>
       <div className="mt-5 grid gap-3">
         {["Competitor AI Visibility Score", "AEO/GEO gap table", "Why AI may recommend them", "Fix priority by competitor gap"].map((item) => (
           <div key={item} className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm font-semibold text-slate-700">
@@ -652,12 +652,13 @@ export function ReportExperience({ isFullDemo, reportId, subscriptionId, hasVeri
   const storedReportObject = useMemo(() => parseStoredReport(storedReport), [storedReport]);
   const leadSubmittedSnapshot = useSyncExternalStore(subscribeToLeadStorage, getLeadSubmittedSnapshot, getServerLeadSubmittedSnapshot);
   const [remoteReport, setRemoteReport] = useState<WebsiteAuditReport | null>(null);
+  const [remoteAccessLevel, setRemoteAccessLevel] = useState<"free" | "full" | "unknown">("unknown");
   const [remoteStatus, setRemoteStatus] = useState<"idle" | "ready" | "error">("idle");
   const hasSavedReportLink = Boolean(reportId);
   const report = hasSavedReportLink ? remoteReport : storedReportObject;
   const topFindings = useMemo(() => report?.findings.slice(0, 3) ?? [], [report]);
   const topFixes = useMemo(() => report?.fixes.slice(0, 3) ?? [], [report]);
-  const isPaidUser = hasVerifiedFullAccess;
+  const isPaidUser = hasSavedReportLink ? remoteAccessLevel === "full" : hasVerifiedFullAccess;
   const hasFullAccess = isPaidUser || isFullDemo;
   const leadSubmitted = isFullDemo || hasSavedReportLink || leadSubmittedSnapshot === "true";
 
@@ -666,14 +667,15 @@ export function ReportExperience({ isFullDemo, reportId, subscriptionId, hasVeri
 
     let isActive = true;
 
-    fetch(`/api/reports/${encodeURIComponent(reportId)}${subscriptionId ? `?subscription_id=${encodeURIComponent(subscriptionId)}` : ""}`)
+    fetch(`/api/reports/${encodeURIComponent(reportId)}`)
       .then(async (response) => {
-        const data = (await response.json()) as { report?: unknown };
+        const data = (await response.json()) as { report?: unknown; accessLevel?: "free" | "full" };
         if (!response.ok || !isWebsiteAuditReport(data.report)) {
           throw new Error("Saved report could not be loaded.");
         }
         if (!isActive) return;
         setRemoteReport(data.report);
+        setRemoteAccessLevel(data.accessLevel === "full" ? "full" : "free");
         setRemoteStatus("ready");
         window.localStorage.setItem(auditStorageKey, JSON.stringify(data.report));
       })
@@ -685,7 +687,7 @@ export function ReportExperience({ isFullDemo, reportId, subscriptionId, hasVeri
     return () => {
       isActive = false;
     };
-  }, [reportId, subscriptionId]);
+  }, [reportId]);
 
   if (hasSavedReportLink && remoteStatus !== "ready" && remoteStatus !== "error") {
     return <SavedReportLoadingState />;

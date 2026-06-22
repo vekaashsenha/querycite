@@ -2,6 +2,7 @@ import * as cheerio from "cheerio";
 import { NextResponse } from "next/server";
 import type { AuditCheck, AuditFinding, CrawlerAccessResult, FindingOwner, FindingPriority, LlmsTxtResult, ScoreName, WebsiteAuditReport } from "@/lib/audit-report";
 import { normalizeWebsiteUrl } from "@/lib/url";
+import { getCurrentUser, syncAuthenticatedUser, type QueryCiteUser } from "@/lib/auth/server";
 import { insertSupabaseRow, isSupabaseAdminConfigured } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -511,11 +512,12 @@ function buildScoreExplanations(checks: Record<string, AuditCheck>, findings: Au
   } satisfies Record<ScoreName, { helped: string[]; hurt: string[]; fixFirst: string[] }>;
 }
 
-async function persistAuditReport(report: WebsiteAuditReport, normalizedUrl: string) {
+async function persistAuditReport(report: WebsiteAuditReport, normalizedUrl: string, user: QueryCiteUser | null) {
   if (!isSupabaseAdminConfigured()) return { auditId: null, reportId: null };
 
   try {
     const auditRows = await insertSupabaseRow("audits", {
+      user_id: user?.id ?? null,
       website_url: normalizedUrl,
       normalized_url: normalizedUrl,
       final_url: report.finalUrl,
@@ -538,6 +540,7 @@ async function persistAuditReport(report: WebsiteAuditReport, normalizedUrl: str
 
     const reportRows = await insertSupabaseRow("reports", {
       audit_id: auditId,
+      user_id: user?.id ?? null,
       website_url: report.websiteUrl,
       final_url: report.finalUrl,
       report_type: "free",
@@ -564,6 +567,8 @@ async function persistAuditReport(report: WebsiteAuditReport, normalizedUrl: str
 }
 export async function POST(request: Request) {
   try {
+    const user = await getCurrentUser();
+    if (user) await syncAuthenticatedUser(user);
     const body = (await request.json()) as AuditRequest;
     const submittedUrl = body.url ?? "";
     const normalizedUrl = normalizeWebsiteUrl(submittedUrl);
@@ -701,7 +706,7 @@ export async function POST(request: Request) {
       },
     };
 
-    const savedReport = await persistAuditReport(report, normalizedUrl);
+    const savedReport = await persistAuditReport(report, normalizedUrl, user);
     const responseReport: WebsiteAuditReport = {
       ...report,
       reportId: savedReport.reportId ?? undefined,

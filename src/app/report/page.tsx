@@ -1,8 +1,9 @@
 import { ReportExperience } from "@/components/ReportExperience";
-import { getPaidAccessContext } from "@/lib/paid-foundation";
+import { getCurrentUser, syncAuthenticatedUser } from "@/lib/auth/server";
+import { getPaidAccessContextForUser } from "@/lib/paid-foundation";
 
 type ReportPageProps = {
-  searchParams?: Promise<{ demo?: string | string[]; reportId?: string | string[]; subscription_id?: string | string[] }>;
+  searchParams?: Promise<{ demo?: string | string[]; reportId?: string | string[] }>;
 };
 
 function firstParam(value: string | string[] | undefined) {
@@ -14,8 +15,12 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
   const demoParam = params.demo;
   const isFullDemo = Array.isArray(demoParam) ? demoParam.includes("full") : demoParam === "full";
   const reportId = firstParam(params.reportId) ?? null;
-  const subscriptionId = firstParam(params.subscription_id) ?? null;
-  const paidAccess = subscriptionId ? await getPaidAccessContext(subscriptionId) : null;
+  const user = await getCurrentUser();
+  const paidAccess = user ? await getPaidAccessContextForUser(user) : null;
 
-  return <ReportExperience isFullDemo={isFullDemo} reportId={reportId} subscriptionId={subscriptionId} hasVerifiedFullAccess={Boolean(paidAccess?.verifiedPaidAccess)} paidPlanName={paidAccess?.planName ?? "free"} />;
+  if (user) {
+    await syncAuthenticatedUser(user);
+  }
+
+  return <ReportExperience isFullDemo={isFullDemo} reportId={reportId} subscriptionId={paidAccess?.subscriptionId ?? null} hasVerifiedFullAccess={Boolean(paidAccess?.verifiedPaidAccess)} paidPlanName={paidAccess?.planName ?? "free"} />;
 }

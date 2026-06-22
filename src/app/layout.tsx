@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
+import { getCurrentUser } from "@/lib/auth/server";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -8,11 +9,13 @@ export const metadata: Metadata = {
   description: "Find why AI search is ignoring your brand with an AI Visibility Audit and AEO/GEO fix generator.",
 };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  const user = await getCurrentUser();
+
   return (
     <html lang="en">
       <body>
-        <Header />
+        <Header user={user ? { email: user.email, name: user.name } : null} />
         {children}
         <Footer />
       </body>

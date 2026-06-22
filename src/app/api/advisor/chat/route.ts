@@ -1,8 +1,9 @@
 import { GoogleGenAI } from "@google/genai";
 import { NextResponse } from "next/server";
-import { getPaidAccessContext } from "@/lib/paid-foundation";
+import { getPaidAccessContextForUser } from "@/lib/paid-foundation";
 import { getGeminiModel } from "@/lib/gemini";
 import { advisorActionCosts, normalizePaidPlanName, planLimits, type AdvisorActionType, type PaidPlanName } from "@/lib/plans";
+import { getCurrentUser, syncAuthenticatedUser } from "@/lib/auth/server";
 import { insertSupabaseRow, isSupabaseAdminConfigured, selectSupabaseRows, updateSupabaseRows } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -136,7 +137,7 @@ function usageAllows(row: UsageRow | null, planName: PaidPlanName, actionType: A
   };
 }
 
-async function getUsage(subscriptionId: string, planName: PaidPlanName, periodStart: string, periodEnd: string, email: string | null, reportId: string | null) {
+async function getUsage(subscriptionId: string, userId: string, planName: PaidPlanName, periodStart: string, periodEnd: string, email: string | null, reportId: string | null) {
   if (!isSupabaseAdminConfigured()) return null;
   const rows = await selectSupabaseRows<UsageRow>("advisor_credit_usage", {
     select: "*",
@@ -149,7 +150,7 @@ async function getUsage(subscriptionId: string, planName: PaidPlanName, periodSt
 
   const limits = planLimits[planName];
   const inserted = await insertSupabaseRow("advisor_credit_usage", {
-    user_id: null,
+    user_id: userId,
     subscription_id: subscriptionId,
     email,
     report_id: reportId,
@@ -219,15 +220,20 @@ export async function POST(request: Request) {
     let resetDate: string | null = null;
 
     if (requestedPlan !== "betaFullReport") {
-      const access = await getPaidAccessContext(body.subscriptionId || null);
-      if (!access.verifiedPaidAccess) {
+      const user = await getCurrentUser();
+      if (!user) {
+        return NextResponse.json({ error: "Please log in to use AI Advisor." }, { status: 401 });
+      }
+      await syncAuthenticatedUser(user);
+      const access = await getPaidAccessContextForUser(user);
+      if (!access.verifiedPaidAccess || !access.subscriptionId) {
         return NextResponse.json({ error: "AI Advisor requires verified paid access." }, { status: 403 });
       }
       planName = access.planName;
       const periodStart = access.currentPeriodStart || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
       const periodEnd = access.currentPeriodEnd || new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString();
       resetDate = periodEnd;
-      usageRow = await getUsage(access.subscriptionId || "", planName, periodStart, periodEnd, access.email, body.reportId || null);
+      usageRow = await getUsage(access.subscriptionId, user.id, planName, periodStart, periodEnd, access.email ?? user.email, body.reportId || null);
       const check = usageAllows(usageRow, planName, actionType);
       if (!check.allowed) {
         return NextResponse.json({ error: "You have used all Advisor credits for this billing period.", usage: check.usage, limits: check.limits, resetDate }, { status: 429 });

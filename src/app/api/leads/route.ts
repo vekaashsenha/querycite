@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getCurrentUser, syncAuthenticatedUser } from "@/lib/auth/server";
 import { insertSupabaseRow, isSupabaseAdminConfigured } from "@/lib/supabase/admin";
 import { getAdminNotificationEmail } from "@/lib/email/resend";
 import { leadCapturedAdminTemplate, leadCapturedUserTemplate } from "@/lib/email/templates";
@@ -45,6 +46,8 @@ function buildReportUrl(request: Request, reportId: string) {
 
 export async function POST(request: Request) {
   try {
+    const user = await getCurrentUser();
+    if (user) await syncAuthenticatedUser(user);
     const body = (await request.json()) as LeadRequest;
     const fullName = compactText(body.fullName);
     const email = compactText(body.email).toLowerCase();
@@ -79,6 +82,7 @@ export async function POST(request: Request) {
     const userAgent = request.headers.get("user-agent") ?? null;
 
     const rows = await insertSupabaseRow("leads", {
+      user_id: user?.id ?? null,
       full_name: fullName,
       email,
       company_name: companyName || null,

@@ -244,6 +244,12 @@ create table if not exists public.payments (
 
 
 -- Paid SaaS foundation additions for private beta.
+-- Auth account mapping additions.
+alter table public.profiles add column if not exists user_id uuid references auth.users(id) on delete cascade;
+alter table public.profiles add column if not exists name text;
+update public.profiles set user_id = id where user_id is null;
+update public.profiles set name = full_name where name is null and full_name is not null;
+alter table public.leads add column if not exists user_id uuid references auth.users(id) on delete set null;
 alter table public.company_profiles alter column owner_user_id drop not null;
 alter table public.company_profiles add column if not exists email text;
 alter table public.company_profiles add column if not exists subscription_id text;
@@ -312,6 +318,9 @@ create table if not exists public.email_events (
   created_at timestamptz not null default now()
 );
 
+create unique index if not exists profiles_user_id_unique on public.profiles(user_id) where user_id is not null;
+create index if not exists profiles_email_idx on public.profiles(email);
+create index if not exists leads_user_id_idx on public.leads(user_id);
 create index if not exists company_profiles_owner_user_id_idx on public.company_profiles(owner_user_id);
 create index if not exists company_profiles_subscription_id_idx on public.company_profiles(subscription_id);
 create index if not exists company_profiles_email_idx on public.company_profiles(email);
@@ -397,11 +406,11 @@ alter table public.payments enable row level security;
 alter table public.email_events enable row level security;
 
 drop policy if exists "profiles_select_own" on public.profiles;
-create policy "profiles_select_own" on public.profiles for select using (id = auth.uid());
+create policy "profiles_select_own" on public.profiles for select using (id = auth.uid() or user_id = auth.uid());
 drop policy if exists "profiles_update_own" on public.profiles;
-create policy "profiles_update_own" on public.profiles for update using (id = auth.uid()) with check (id = auth.uid());
+create policy "profiles_update_own" on public.profiles for update using (id = auth.uid() or user_id = auth.uid()) with check (id = auth.uid() or user_id = auth.uid());
 drop policy if exists "profiles_insert_own" on public.profiles;
-create policy "profiles_insert_own" on public.profiles for insert with check (id = auth.uid());
+create policy "profiles_insert_own" on public.profiles for insert with check (id = auth.uid() or user_id = auth.uid());
 
 drop policy if exists "company_profiles_select_own" on public.company_profiles;
 create policy "company_profiles_select_own" on public.company_profiles for select using (owner_user_id = auth.uid());
