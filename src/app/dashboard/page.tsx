@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { AdvisorChat } from "@/components/AdvisorChat";
 import { DashboardShell, WorkspaceHeader } from "@/components/DashboardShell";
 import { AppCard, EmptyState, LockedPanel, MetricCard, PrimaryLink, StatusPill } from "@/components/ui";
@@ -21,20 +21,36 @@ export default async function DashboardPage() {
   const latestScore = latestReport?.aiVisibilityScore ? `${latestReport.aiVisibilityScore}/100` : "-";
   const advisorCredits = hasWorkspaceAccess ? `0/${access.limits.advisorCredits}` : "0/0";
   const competitorChanges = hasWorkspaceAccess ? `${access.limits.competitorChanges}/${access.limits.competitorChanges}` : "0/3";
+  const badgeText = access.qaAccess ? "Admin preview" : access.isPaidBetaAccess ? "Paid beta access active" : access.isExpiredBetaAccess ? "Paid beta access expired" : access.verifiedPaidAccess ? "Full access" : "Free account";
+  const badgeTone = access.qaAccess ? "cyan" : access.isPaidBetaAccess ? "green" : access.isExpiredBetaAccess ? "amber" : access.verifiedPaidAccess ? "green" : "slate";
+  const statusText = access.qaAccess ? "Admin QA access active" : access.isPaidBetaAccess ? "Paid beta access active" : access.isExpiredBetaAccess ? "Paid beta access expired" : access.status;
 
   return (
     <DashboardShell
       user={{ email: user.email, name: user.name, isAdmin: access.isAdmin }}
       title="Overview"
       description="Your QueryCite workspace for saved reports, AI visibility signals, Advisor usage, competitor context, and billing status."
-      badge={<StatusPill tone={access.qaAccess ? "cyan" : access.verifiedPaidAccess ? "green" : "slate"}>{access.qaAccess ? "Admin preview" : access.verifiedPaidAccess ? "Full access" : "Free account"}</StatusPill>}
+      badge={<StatusPill tone={badgeTone}>{badgeText}</StatusPill>}
     >
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="Latest score" value={latestScore} detail={latestReport ? latestReport.finalUrl || latestReport.websiteUrl : "No reports yet"} tone="violet" />
         <MetricCard label="Reports generated" value={reports.length} detail="Reports linked to this account" tone="green" />
-        <MetricCard label="Advisor credits used" value={advisorCredits} detail={hasWorkspaceAccess ? (access.qaAccess ? "Admin QA access active" : "Local usage resets by billing period") : "Unlock with full report access"} tone="cyan" />
+        <MetricCard label="Advisor credits used" value={advisorCredits} detail={hasWorkspaceAccess ? (access.qaAccess ? "Admin QA access active" : access.isPaidBetaAccess ? `Valid until ${formatDate(access.accessEndsAt)}` : "Local usage resets by billing period") : "Unlock with full report access"} tone="cyan" />
         <MetricCard label="Competitor changes left" value={competitorChanges} detail="Limit applies per billing period" tone="amber" />
       </section>
+
+      {access.isExpiredBetaAccess ? (
+        <AppCard className="border-amber-200 bg-amber-50 p-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <StatusPill tone="amber">Paid beta access expired</StatusPill>
+              <h2 className="mt-3 text-xl font-semibold text-slate-950">Your 1-month paid beta access has ended.</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-700">Full report sections, full PDF/CSV exports, competitor comparison, and AI Advisor are locked until you renew, upgrade, or contact support.</p>
+            </div>
+            <Link href="/pricing" className="inline-flex min-h-11 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-semibold text-white">Renew or upgrade</Link>
+          </div>
+        </AppCard>
+      ) : null}
 
       <section className="grid gap-6 xl:grid-cols-[1fr_0.74fr]">
         <AppCard className="p-6">
@@ -71,12 +87,13 @@ export default async function DashboardPage() {
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-violet-700">Plan status</p>
               <h2 className="mt-2 text-2xl font-semibold text-slate-950">{access.rawPlanName || access.planName}</h2>
             </div>
-            <StatusPill tone={access.qaAccess ? "cyan" : access.verifiedPaidAccess ? "green" : "amber"}>{access.qaAccess ? "Admin QA access active" : access.status}</StatusPill>
+            <StatusPill tone={badgeTone}>{statusText}</StatusPill>
           </div>
           <div className="mt-5 grid gap-3 text-sm font-semibold text-slate-700">
             {[
               ["Signed in", user.email],
-              ["Renewal/reset", hasWorkspaceAccess ? (access.qaAccess ? "QA mode" : formatDate(getAdvisorResetDate(access))) : "Not active"],
+              ["Access valid until", hasWorkspaceAccess ? (access.qaAccess ? "QA mode" : formatDate(access.accessEndsAt ?? getAdvisorResetDate(access))) : access.isExpiredBetaAccess ? formatDate(access.accessEndsAt) : "Not active"],
+              ["Coupon", access.couponCode || "-"],
               ["Competitors", hasWorkspaceAccess ? `${access.limits.competitors} domains` : "Locked"],
               ["Full exports", hasWorkspaceAccess ? "PDF and CSV" : "Locked"],
             ].map(([label, value]) => (

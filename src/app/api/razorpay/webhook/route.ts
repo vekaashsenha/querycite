@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
+import { betaAccessWindow, normalizeCouponCode } from "@/lib/coupons";
 import { getAdminNotificationEmail } from "@/lib/email/resend";
 import { paymentFailedUserTemplate, paymentSuccessUserTemplate, subscriptionActiveUserTemplate, subscriptionStatusChangedUserTemplate } from "@/lib/email/templates";
 import { sendTransactionalEmail } from "@/lib/email/sendTransactionalEmail";
@@ -12,11 +13,29 @@ type JsonRecord = Record<string, unknown>;
 type StoredSubscription = {
   id?: string;
   razorpay_subscription_id?: string;
+  razorpay_order_id?: string;
 };
 
 type StoredPayment = {
   id?: string;
   razorpay_payment_id?: string;
+};
+
+type CouponCodeRow = {
+  id?: string;
+  code?: string;
+  redeemed_count?: number | null;
+  max_redemptions?: number | null;
+  is_active?: boolean | null;
+  expires_at?: string | null;
+};
+
+type CouponRedemptionRow = {
+  id?: string;
+  user_id?: string | null;
+  email?: string | null;
+  razorpay_payment_id?: string | null;
+  status?: string | null;
 };
 
 const handledEvents = new Set([
@@ -37,7 +56,7 @@ function asRecord(value: unknown): JsonRecord {
 }
 
 function text(value: unknown) {
-  return typeof value === "string" ? value : null;
+  return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
 function numberValue(value: unknown) {
@@ -52,12 +71,16 @@ function notesFrom(entity: JsonRecord) {
   return asRecord(entity.notes);
 }
 
+function noteText(subscription: JsonRecord, payment: JsonRecord, key: string) {
+  return text(notesFrom(payment)[key]) || text(notesFrom(subscription)[key]);
+}
+
 function planNameFrom(subscription: JsonRecord, payment: JsonRecord) {
-  return text(notesFrom(subscription).plan_name) || text(notesFrom(payment).plan_name) || "starter";
+  return noteText(subscription, payment, "plan_name") || noteText(subscription, payment, "selected_plan") || "starter";
 }
 
 function paymentTypeFrom(subscription: JsonRecord, payment: JsonRecord) {
-  const explicitPaymentType = text(notesFrom(payment).payment_type) || text(notesFrom(subscription).payment_type);
+  const explicitPaymentType = noteText(subscription, payment, "payment_type");
   if (explicitPaymentType) return explicitPaymentType;
   if (text(payment.subscription_id) || text(subscription.id)) return "subscription_test";
   if (text(payment.order_id)) return "one_time_test";
@@ -65,11 +88,60 @@ function paymentTypeFrom(subscription: JsonRecord, payment: JsonRecord) {
 }
 
 function websiteFrom(subscription: JsonRecord, payment: JsonRecord) {
-  return text(notesFrom(subscription).website_url) || text(notesFrom(payment).website_url);
+  return noteText(subscription, payment, "website_url");
 }
 
 function emailFrom(subscription: JsonRecord, payment: JsonRecord) {
-  return text(payment.email) || text(subscription.email) || text(notesFrom(subscription).email) || text(notesFrom(payment).email);
+  return text(payment.email) || text(subscription.email) || noteText(subscription, payment, "email") || noteText(subscription, payment, "user_email");
+}
+
+function userIdFrom(subscription: JsonRecord, payment: JsonRecord) {
+  return noteText(subscription, payment, "user_id");
+}
+
+function couponCodeFrom(subscription: JsonRecord, payment: JsonRecord) {
+  const code = noteText(subscription, payment, "coupon_code");
+  return code ? normalizeCouponCode(code) : null;
+}
+
+function cleanEmail(value: string | null | undefined) {
+  return value ? value.trim().toLowerCase() : "";
+}
+
+function isCapturedStatus(status: string | null | undefined) {
+  return status === "captured" || status === "active" || status === "paid_beta_active";
+}
+
+function couponExpired(expiresAt: string | null | undefined) {
+  return Boolean(expiresAt && Date.parse(expiresAt) <= Date.now());
+}
+
+function couponFullyRedeemed(coupon: CouponCodeRow) {
+  return (coupon.redeemed_count ?? 0) >= (coupon.max_redemptions ?? 50);
+}
+
+function redemptionMatchesUser(redemption: CouponRedemptionRow, userId: string | null, email: string | null) {
+  if (!isCapturedStatus(redemption.status)) return false;
+  if (userId && redemption.user_id === userId) return true;
+  if (email && cleanEmail(redemption.email) === cleanEmail(email)) return true;
+  return false;
+}
+
+function capturedAtFrom(payload: JsonRecord, payment: JsonRecord) {
+  const iso = unixSecondsToIso(payment.created_at) || unixSecondsToIso(payload.created_at);
+  return iso ? new Date(iso) : new Date();
+}
+
+function accessWindowFrom(payload: JsonRecord, subscription: JsonRecord, payment: JsonRecord) {
+  const capturedAt = capturedAtFrom(payload, payment);
+  const days = Number(noteText(subscription, payment, "access_duration_days") || 30);
+  const window = betaAccessWindow(capturedAt);
+  if (Number.isFinite(days) && days > 0 && days !== 30) {
+    const ends = new Date(capturedAt);
+    ends.setDate(ends.getDate() + days);
+    return { startsAt: capturedAt.toISOString(), endsAt: ends.toISOString() };
+  }
+  return window;
 }
 
 function getAppBaseUrl() {
@@ -82,6 +154,82 @@ function reportUrlFor() {
 
 function currentPeriodAllowsAccess(currentPeriodEnd: string | null) {
   return Boolean(currentPeriodEnd && Date.parse(currentPeriodEnd) > Date.now());
+}
+
+async function getCoupon(code: string) {
+  const rows = await selectSupabaseRows<CouponCodeRow>("coupon_codes", {
+    select: "id,code,redeemed_count,max_redemptions,is_active,expires_at",
+    code: `eq.${code}`,
+    limit: "1",
+  });
+  return rows[0] ?? null;
+}
+
+async function getCouponRedemptions(code: string) {
+  return await selectSupabaseRows<CouponRedemptionRow>("coupon_redemptions", {
+    select: "id,user_id,email,razorpay_payment_id,status",
+    code: `eq.${code}`,
+    limit: "200",
+  });
+}
+
+async function couponAllowsCapturedAccess(code: string | null, userId: string | null, email: string | null, paymentId: string | null) {
+  if (!code) return true;
+  if (!isSupabaseAdminConfigured()) return false;
+
+  const coupon = await getCoupon(code);
+  if (!coupon?.id || coupon.is_active === false || couponExpired(coupon.expires_at) || couponFullyRedeemed(coupon)) return false;
+
+  const redemptions = await getCouponRedemptions(code);
+  if (paymentId && redemptions.some((redemption) => redemption.razorpay_payment_id === paymentId && isCapturedStatus(redemption.status))) return true;
+  return !redemptions.some((redemption) => redemptionMatchesUser(redemption, userId, email));
+}
+
+async function recordCouponRedemption(payload: JsonRecord, eventName: string) {
+  if (eventName !== "payment.captured" || !isSupabaseAdminConfigured()) return;
+
+  const subscription = entityFromPayload(payload, "subscription");
+  const payment = entityFromPayload(payload, "payment");
+  const code = couponCodeFrom(subscription, payment);
+  const paymentId = text(payment.id);
+  const orderId = text(payment.order_id);
+  if (!code || !paymentId) return;
+
+  const existing = await selectSupabaseRows<CouponRedemptionRow>("coupon_redemptions", {
+    select: "id",
+    razorpay_payment_id: `eq.${paymentId}`,
+    limit: "1",
+  });
+  if (existing[0]?.id) return;
+
+  const coupon = await getCoupon(code);
+  if (!coupon?.id || coupon.is_active === false || couponExpired(coupon.expires_at) || couponFullyRedeemed(coupon)) return;
+
+  const userId = userIdFrom(subscription, payment);
+  const email = emailFrom(subscription, payment);
+  const redemptions = await getCouponRedemptions(code);
+  if (redemptions.some((redemption) => redemptionMatchesUser(redemption, userId, email))) return;
+
+  const amount = numberValue(payment.amount) ?? 0;
+  const capturedAt = capturedAtFrom(payload, payment).toISOString();
+  await insertSupabaseRow("coupon_redemptions", {
+    coupon_id: coupon.id,
+    code,
+    user_id: userId,
+    email,
+    razorpay_payment_id: paymentId,
+    razorpay_order_id: orderId,
+    amount_paise: amount,
+    currency: text(payment.currency) || "INR",
+    status: "captured",
+    redeemed_at: capturedAt,
+    created_at: capturedAt,
+  });
+
+  await updateSupabaseRows("coupon_codes", { id: `eq.${coupon.id}` }, {
+    redeemed_count: (coupon.redeemed_count ?? 0) + 1,
+    updated_at: new Date().toISOString(),
+  });
 }
 
 function mapSubscriptionAccess(eventName: string, subscription: JsonRecord) {
@@ -112,11 +260,74 @@ async function upsertSubscription(payload: JsonRecord, eventName: string) {
   const subscription = entityFromPayload(payload, "subscription");
   const payment = entityFromPayload(payload, "payment");
   const subscriptionId = text(subscription.id) || text(payment.subscription_id);
-  if (!subscriptionId) return null;
+  const now = new Date().toISOString();
+
+  if (!subscriptionId) {
+    const paymentType = paymentTypeFrom(subscription, payment);
+    const orderId = text(payment.order_id);
+    if (paymentType !== "one_time_beta" || !orderId) return null;
+
+    const paymentId = text(payment.id);
+    const couponCode = couponCodeFrom(subscription, payment);
+    const userId = userIdFrom(subscription, payment);
+    const email = emailFrom(subscription, payment);
+    const captured = eventName === "payment.captured";
+    const couponAllows = captured ? await couponAllowsCapturedAccess(couponCode, userId, email, paymentId) : false;
+    const accessWindow = captured && couponAllows ? accessWindowFrom(payload, subscription, payment) : { startsAt: null, endsAt: null };
+    const status = eventName === "payment.failed" ? "failed" : captured && couponAllows ? "active" : couponCode ? "coupon_invalid" : "pending";
+
+    const row = {
+      user_id: userId,
+      email,
+      plan_name: planNameFrom(subscription, payment),
+      status,
+      provider: "razorpay",
+      product: "querycite",
+      provider_customer_id: text(payment.customer_id),
+      provider_subscription_id: null,
+      razorpay_customer_id: text(payment.customer_id),
+      razorpay_subscription_id: null,
+      razorpay_order_id: orderId,
+      payment_type: paymentType,
+      coupon_code: couponCode,
+      amount_paise: numberValue(payment.amount),
+      currency: text(payment.currency) || "INR",
+      paid_access: captured && couponAllows,
+      current_period_start: accessWindow.startsAt,
+      current_period_end: accessWindow.endsAt,
+      access_starts_at: accessWindow.startsAt,
+      access_ends_at: accessWindow.endsAt,
+      renewal_date: null,
+      next_billing_date: accessWindow.endsAt,
+      cancel_at_period_end: false,
+      failed_payment_count: eventName === "payment.failed" ? 1 : 0,
+      website_url: websiteFrom(subscription, payment),
+      raw_event: payload,
+      metadata: { event: eventName, notes: notesFrom(payment), access_type: "paid_beta_one_time" },
+      updated_at: now,
+    };
+
+    const existing = await selectSupabaseRows<StoredSubscription>("subscriptions", {
+      select: "id",
+      razorpay_order_id: `eq.${orderId}`,
+      limit: "1",
+    });
+
+    if (existing[0]?.id) {
+      const updated = await updateSupabaseRows("subscriptions", { id: `eq.${existing[0].id}` }, row);
+      return updated[0]?.id ?? existing[0].id;
+    }
+
+    const inserted = await insertSupabaseRow("subscriptions", {
+      ...row,
+      created_at: now,
+    });
+    return inserted[0]?.id ?? null;
+  }
 
   const access = mapSubscriptionAccess(eventName, subscription);
-  const now = new Date().toISOString();
   const row = {
+    user_id: userIdFrom(subscription, payment),
     email: emailFrom(subscription, payment),
     plan_name: planNameFrom(subscription, payment),
     status: access.status,
@@ -166,7 +377,11 @@ async function upsertPayment(payload: JsonRecord, eventName: string, subscriptio
   if (!paymentId) return null;
 
   const now = new Date().toISOString();
+  const paymentType = paymentTypeFrom(subscription, payment);
+  const captured = eventName === "payment.captured";
+  const accessWindow = paymentType === "one_time_beta" && captured ? accessWindowFrom(payload, subscription, payment) : { startsAt: null, endsAt: null };
   const row = {
+    user_id: userIdFrom(subscription, payment),
     subscription_id: subscriptionRowId,
     provider: "razorpay",
     provider_payment_id: paymentId,
@@ -176,12 +391,16 @@ async function upsertPayment(payload: JsonRecord, eventName: string, subscriptio
     razorpay_subscription_id: text(payment.subscription_id) || text(subscription.id),
     razorpay_customer_id: text(payment.customer_id) || text(subscription.customer_id),
     product: "querycite",
-    payment_type: paymentTypeFrom(subscription, payment),
+    payment_type: paymentType,
     plan_name: planNameFrom(subscription, payment),
+    coupon_code: couponCodeFrom(subscription, payment),
     email: emailFrom(subscription, payment),
     amount: numberValue(payment.amount),
+    amount_paise: numberValue(payment.amount),
     amount_cents: numberValue(payment.amount),
     currency: text(payment.currency) || "INR",
+    access_starts_at: accessWindow.startsAt,
+    access_ends_at: accessWindow.endsAt,
     status: eventName === "payment.failed" ? "failed" : text(payment.status) || "captured",
     event_payload: payload,
     raw_event: payload,
@@ -213,16 +432,19 @@ async function sendWebhookEmails(payload: JsonRecord, eventName: string, subscri
   const planName = planNameFrom(subscription, payment);
   const subscriptionId = text(subscription.id) || text(payment.subscription_id);
   const paymentId = text(payment.id);
+  const orderId = text(payment.order_id);
   const paymentType = paymentTypeFrom(subscription, payment);
-  const hasFullReportAccess = paymentType !== "one_time_test" && Boolean(subscriptionId);
+  const accessWindow = paymentType === "one_time_beta" && eventName === "payment.captured" ? accessWindowFrom(payload, subscription, payment) : { startsAt: null, endsAt: null };
+  const hasFullReportAccess = paymentType === "one_time_beta" && eventName === "payment.captured" ? true : paymentType !== "one_time_test" && Boolean(subscriptionId);
+  const amount = numberValue(payment.amount);
   const data = {
     email: recipient,
     planName,
-    subscriptionId,
+    subscriptionId: subscriptionId || orderId,
     paymentId,
     status: text(subscription.status) || text(payment.status) || eventName,
-    amount: numberValue(payment.amount) ? `${numberValue(payment.amount)} ${text(payment.currency) || "INR"}` : null,
-    nextBillingDate: unixSecondsToIso(subscription.charge_at),
+    amount: amount ? `${(amount / 100).toLocaleString("en-IN", { style: "currency", currency: text(payment.currency) || "INR" })}` : null,
+    nextBillingDate: unixSecondsToIso(subscription.charge_at) || accessWindow.endsAt,
     reportUrl: reportUrlFor(),
     hasFullReportAccess,
   };
@@ -290,6 +512,7 @@ export async function POST(request: Request) {
       ? await upsertPayment(payload, eventName, subscriptionRowId)
       : null;
 
+    await recordCouponRedemption(payload, eventName);
     await sendWebhookEmails(payload, eventName, subscriptionRowId, paymentRowId);
 
     return NextResponse.json({ ok: true, event: eventName, stored: isSupabaseAdminConfigured() });

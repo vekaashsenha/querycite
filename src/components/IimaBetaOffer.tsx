@@ -68,7 +68,7 @@ export function IimaBetaOffer({ name, email }: IimaBetaOfferProps) {
             <p>$2 equivalent</p>
             <p className="text-slate-950">Pay ₹199 for 1-month paid beta access</p>
           </div>
-          <p className="mt-4 text-xs font-semibold leading-5 text-slate-500">Use only the cohort code shared with you. This is cohort beta access and does not imply an official institutional partnership.</p>
+          <p className="mt-4 text-xs font-semibold leading-5 text-slate-500">Use only the cohort code shared with you. This cohort beta access is privately shared for feedback.</p>
         </div>
 
         <div className="rounded-3xl border border-white/80 bg-white p-5 shadow-sm">

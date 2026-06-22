@@ -1,4 +1,4 @@
-import { normalizeWebsiteUrl } from "@/lib/url";
+﻿import { normalizeWebsiteUrl } from "@/lib/url";
 import { normalizePaidPlanName, planLimits, type PaidPlanName, type PlanLimits } from "@/lib/plans";
 import { isSupabaseAdminConfigured, selectSupabaseRows } from "@/lib/supabase/admin";
 import type { AuditFinding, WebsiteAuditReport } from "@/lib/audit-report";
@@ -19,6 +19,13 @@ type SubscriptionRow = {
   razorpay_subscription_id?: string | null;
   provider_customer_id?: string | null;
   provider_subscription_id?: string | null;
+  razorpay_order_id?: string | null;
+  payment_type?: string | null;
+  coupon_code?: string | null;
+  amount_paise?: number | null;
+  currency?: string | null;
+  access_starts_at?: string | null;
+  access_ends_at?: string | null;
 };
 
 export type DashboardReport = {
@@ -42,6 +49,9 @@ export type PaymentHistoryItem = {
   status: string;
   paymentType: string | null;
   planName: string | null;
+  couponCode: string | null;
+  accessStartsAt: string | null;
+  accessEndsAt: string | null;
   razorpayPaymentId: string | null;
   razorpayOrderId: string | null;
   providerInvoiceId: string | null;
@@ -64,6 +74,14 @@ export type PaidAccessContext = {
   currentPeriodStart: string | null;
   currentPeriodEnd: string | null;
   renewalDate: string | null;
+  paymentType: string | null;
+  couponCode: string | null;
+  amountPaise: number | null;
+  currency: string;
+  accessStartsAt: string | null;
+  accessEndsAt: string | null;
+  isPaidBetaAccess: boolean;
+  isExpiredBetaAccess: boolean;
   limits: PlanLimits;
 };
 
@@ -71,11 +89,32 @@ function isCurrentPeriodActive(end: string | null | undefined) {
   return Boolean(end && Date.parse(end) > Date.now());
 }
 
+function isOneTimeBetaRow(row: SubscriptionRow | undefined) {
+  return row?.payment_type === "one_time_beta";
+}
+
+function betaAccessEnd(row: SubscriptionRow | undefined) {
+  return row?.access_ends_at ?? row?.current_period_end ?? null;
+}
+
 function rowAllowsPaidAccess(row: SubscriptionRow | undefined) {
   if (!row) return false;
+  const end = betaAccessEnd(row);
+
+  if (isOneTimeBetaRow(row) || row.coupon_code) {
+    return row.paid_access === true && row.status === "active" && isCurrentPeriodActive(end);
+  }
+
+  if (row.paid_access === true && end) return isCurrentPeriodActive(end);
   if (row.paid_access === true) return true;
   if (row.status === "cancelled" && isCurrentPeriodActive(row.current_period_end)) return true;
   return false;
+}
+
+function statusFromRow(row: SubscriptionRow, verifiedPaidAccess: boolean) {
+  if (verifiedPaidAccess) return "active";
+  if ((isOneTimeBetaRow(row) || row.coupon_code) && row.status === "active" && !isCurrentPeriodActive(betaAccessEnd(row))) return "expired";
+  return row.status || "unpaid";
 }
 
 function emptyContext(subscriptionId?: string | null, user?: QueryCiteUser | null): PaidAccessContext {
@@ -95,6 +134,14 @@ function emptyContext(subscriptionId?: string | null, user?: QueryCiteUser | nul
     currentPeriodStart: null,
     currentPeriodEnd: null,
     renewalDate: null,
+    paymentType: null,
+    couponCode: null,
+    amountPaise: null,
+    currency: "INR",
+    accessStartsAt: null,
+    accessEndsAt: null,
+    isPaidBetaAccess: false,
+    isExpiredBetaAccess: false,
     limits: planLimits.free,
   };
 }
@@ -104,7 +151,9 @@ function contextFromRow(row: SubscriptionRow | undefined, fallbackSubscriptionId
 
   const planName = normalizePaidPlanName(row.plan_name);
   const verifiedPaidAccess = rowAllowsPaidAccess(row);
-  const subscriptionId = row.razorpay_subscription_id || row.provider_subscription_id || fallbackSubscriptionId || null;
+  const subscriptionId = row.razorpay_subscription_id || row.provider_subscription_id || row.razorpay_order_id || fallbackSubscriptionId || row.id || null;
+  const accessEnd = betaAccessEnd(row);
+  const oneTimeBeta = isOneTimeBetaRow(row);
 
   return {
     isConfigured: true,
@@ -117,26 +166,33 @@ function contextFromRow(row: SubscriptionRow | undefined, fallbackSubscriptionId
     email: row.email ?? user?.email ?? null,
     planName: verifiedPaidAccess ? planName : "free",
     rawPlanName: row.plan_name ?? null,
-    status: verifiedPaidAccess ? "active" : row.status || "unpaid",
+    status: statusFromRow(row, verifiedPaidAccess),
     websiteUrl: row.website_url ?? null,
-    currentPeriodStart: row.current_period_start ?? null,
-    currentPeriodEnd: row.current_period_end ?? null,
-    renewalDate: row.next_billing_date ?? row.renewal_date ?? row.current_period_end ?? null,
+    currentPeriodStart: row.access_starts_at ?? row.current_period_start ?? null,
+    currentPeriodEnd: accessEnd,
+    renewalDate: row.next_billing_date ?? row.renewal_date ?? accessEnd,
+    paymentType: row.payment_type ?? null,
+    couponCode: row.coupon_code ?? null,
+    amountPaise: row.amount_paise ?? null,
+    currency: row.currency ?? "INR",
+    accessStartsAt: row.access_starts_at ?? row.current_period_start ?? null,
+    accessEndsAt: accessEnd,
+    isPaidBetaAccess: oneTimeBeta && verifiedPaidAccess,
+    isExpiredBetaAccess: oneTimeBeta && !verifiedPaidAccess && Boolean(accessEnd && Date.parse(accessEnd) <= Date.now()),
     limits: verifiedPaidAccess ? planLimits[planName] : planLimits.free,
   };
 }
 
-const subscriptionSelect = "id,user_id,email,plan_name,status,paid_access,website_url,current_period_start,current_period_end,next_billing_date,renewal_date,razorpay_subscription_id,provider_subscription_id,provider_customer_id";
+const subscriptionSelect = "id,user_id,email,plan_name,status,paid_access,website_url,current_period_start,current_period_end,next_billing_date,renewal_date,razorpay_subscription_id,provider_subscription_id,provider_customer_id,razorpay_order_id,payment_type,coupon_code,amount_paise,currency,access_starts_at,access_ends_at";
 
 export async function getPaidAccessContext(subscriptionId?: string | null): Promise<PaidAccessContext> {
   if (!subscriptionId || !isSupabaseAdminConfigured()) return emptyContext(subscriptionId);
 
-  const rows = await selectSupabaseRows<SubscriptionRow>("subscriptions", {
-    select: subscriptionSelect,
-    razorpay_subscription_id: `eq.${subscriptionId}`,
-    order: "updated_at.desc",
-    limit: "1",
-  });
+  const params = subscriptionId.startsWith("order_")
+    ? { select: subscriptionSelect, razorpay_order_id: `eq.${subscriptionId}`, order: "updated_at.desc", limit: "1" }
+    : { select: subscriptionSelect, razorpay_subscription_id: `eq.${subscriptionId}`, order: "updated_at.desc", limit: "1" };
+
+  const rows = await selectSupabaseRows<SubscriptionRow>("subscriptions", params);
 
   return contextFromRow(rows[0], subscriptionId);
 }
@@ -157,7 +213,7 @@ export async function getPaidAccessContextForUser(user: QueryCiteUser | null): P
     limit: "1",
   });
 
-  const context = contextFromRow(rows[0], rows[0]?.razorpay_subscription_id || rows[0]?.provider_subscription_id || null, user);
+  const context = contextFromRow(rows[0], rows[0]?.razorpay_subscription_id || rows[0]?.provider_subscription_id || rows[0]?.razorpay_order_id || null, user);
   if (!admin) return context;
 
   return {
@@ -247,11 +303,15 @@ export async function getReportsForPaidContext(context: PaidAccessContext): Prom
 type PaymentRow = {
   id?: string | null;
   amount?: number | null;
+  amount_paise?: number | null;
   amount_cents?: number | null;
   currency?: string | null;
   status?: string | null;
   payment_type?: string | null;
   plan_name?: string | null;
+  coupon_code?: string | null;
+  access_starts_at?: string | null;
+  access_ends_at?: string | null;
   razorpay_payment_id?: string | null;
   razorpay_order_id?: string | null;
   provider_invoice_id?: string | null;
@@ -261,11 +321,14 @@ type PaymentRow = {
 function mapPayment(row: PaymentRow): PaymentHistoryItem {
   return {
     id: row.id ?? `${row.razorpay_payment_id ?? "payment"}-${row.created_at ?? ""}`,
-    amount: row.amount ?? row.amount_cents ?? null,
+    amount: row.amount_paise ?? row.amount ?? row.amount_cents ?? null,
     currency: row.currency ?? "INR",
     status: row.status ?? "unknown",
     paymentType: row.payment_type ?? null,
     planName: row.plan_name ?? null,
+    couponCode: row.coupon_code ?? null,
+    accessStartsAt: row.access_starts_at ?? null,
+    accessEndsAt: row.access_ends_at ?? null,
     razorpayPaymentId: row.razorpay_payment_id ?? null,
     razorpayOrderId: row.razorpay_order_id ?? null,
     providerInvoiceId: row.provider_invoice_id ?? null,
@@ -273,16 +336,16 @@ function mapPayment(row: PaymentRow): PaymentHistoryItem {
   };
 }
 
+const paymentSelect = "id,amount,amount_paise,amount_cents,currency,status,payment_type,plan_name,coupon_code,access_starts_at,access_ends_at,razorpay_payment_id,razorpay_order_id,provider_invoice_id,created_at";
+
 export async function getPaymentHistoryForPaidContext(context: PaidAccessContext): Promise<PaymentHistoryItem[]> {
   if (!context.subscriptionId || !isSupabaseAdminConfigured()) return [];
 
-  const rows = await selectSupabaseRows<PaymentRow>("payments", {
-    select: "id,amount,amount_cents,currency,status,payment_type,plan_name,razorpay_payment_id,razorpay_order_id,provider_invoice_id,created_at",
-    razorpay_subscription_id: `eq.${context.subscriptionId}`,
-    order: "created_at.desc",
-    limit: "20",
-  });
+  const params = context.paymentType === "one_time_beta"
+    ? { select: paymentSelect, razorpay_order_id: `eq.${context.subscriptionId}`, order: "created_at.desc", limit: "20" }
+    : { select: paymentSelect, razorpay_subscription_id: `eq.${context.subscriptionId}`, order: "created_at.desc", limit: "20" };
 
+  const rows = await selectSupabaseRows<PaymentRow>("payments", params);
   return rows.map(mapPayment);
 }
 
@@ -290,7 +353,7 @@ export async function getPaymentHistoryForUser(user: QueryCiteUser): Promise<Pay
   if (!isSupabaseAdminConfigured()) return [];
 
   const rows = await selectSupabaseRows<PaymentRow>("payments", {
-    select: "id,amount,amount_cents,currency,status,payment_type,plan_name,razorpay_payment_id,razorpay_order_id,provider_invoice_id,created_at",
+    select: paymentSelect,
     or: `(user_id.eq.${user.id},email.eq.${user.email})`,
     order: "created_at.desc",
     limit: "20",

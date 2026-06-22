@@ -1,4 +1,4 @@
--- QueryCite Supabase schema for private beta backend foundation.
+﻿-- QueryCite Supabase schema for private beta backend foundation.
 -- Run this in the Supabase SQL Editor for the project connected to QueryCite.
 
 create extension if not exists pgcrypto;
@@ -323,6 +323,60 @@ alter table public.payments add column if not exists plan_name text;
 alter table public.payments add column if not exists amount int;
 alter table public.payments add column if not exists raw_event jsonb;
 
+alter table public.subscriptions add column if not exists razorpay_order_id text;
+alter table public.subscriptions add column if not exists payment_type text;
+alter table public.subscriptions add column if not exists coupon_code text;
+alter table public.subscriptions add column if not exists amount_paise integer;
+alter table public.subscriptions add column if not exists currency text not null default 'INR';
+alter table public.subscriptions add column if not exists access_starts_at timestamptz;
+alter table public.subscriptions add column if not exists access_ends_at timestamptz;
+
+alter table public.payments add column if not exists amount_paise integer;
+alter table public.payments add column if not exists coupon_code text;
+alter table public.payments add column if not exists access_starts_at timestamptz;
+alter table public.payments add column if not exists access_ends_at timestamptz;
+
+create table if not exists public.coupon_codes (
+  id uuid primary key default gen_random_uuid(),
+  code text unique not null,
+  description text,
+  final_amount_paise integer not null,
+  currency text default 'INR',
+  max_redemptions integer default 50,
+  redeemed_count integer default 0,
+  is_active boolean default true,
+  expires_at timestamptz,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create table if not exists public.coupon_redemptions (
+  id uuid primary key default gen_random_uuid(),
+  coupon_id uuid references public.coupon_codes(id),
+  code text not null,
+  user_id uuid references auth.users(id) on delete set null,
+  email text,
+  razorpay_payment_id text,
+  razorpay_order_id text,
+  amount_paise integer not null,
+  currency text default 'INR',
+  status text not null default 'pending',
+  redeemed_at timestamptz,
+  created_at timestamptz default now()
+);
+
+insert into public.coupon_codes (code, description, final_amount_paise, currency, max_redemptions, is_active)
+values
+  ('IIMA-AGMP18', 'Exclusive IIMA Beta Offer: ₹199 for 1-month paid beta access', 19900, 'INR', 50, true),
+  ('IIMA-DMBPT02', 'Exclusive IIMA Beta Offer: ₹199 for 1-month paid beta access', 19900, 'INR', 50, true)
+on conflict (code) do update set
+  description = excluded.description,
+  final_amount_paise = excluded.final_amount_paise,
+  currency = excluded.currency,
+  max_redemptions = excluded.max_redemptions,
+  is_active = excluded.is_active,
+  updated_at = now();
+
 create table if not exists public.email_events (
   id uuid primary key default gen_random_uuid(),
   recipient_email text not null,
@@ -370,6 +424,19 @@ create index if not exists payments_razorpay_subscription_id_idx on public.payme
 create index if not exists payments_razorpay_order_id_idx on public.payments(razorpay_order_id);
 create index if not exists payments_payment_type_idx on public.payments(payment_type);
 create index if not exists payments_email_idx on public.payments(email);
+create index if not exists subscriptions_razorpay_order_id_idx on public.subscriptions(razorpay_order_id);
+create index if not exists subscriptions_payment_type_idx on public.subscriptions(payment_type);
+create index if not exists subscriptions_coupon_code_idx on public.subscriptions(coupon_code);
+create index if not exists subscriptions_access_ends_at_idx on public.subscriptions(access_ends_at);
+create index if not exists payments_coupon_code_idx on public.payments(coupon_code);
+create index if not exists payments_access_ends_at_idx on public.payments(access_ends_at);
+create index if not exists coupon_codes_code_idx on public.coupon_codes(code);
+create index if not exists coupon_codes_active_idx on public.coupon_codes(is_active);
+create index if not exists coupon_redemptions_code_idx on public.coupon_redemptions(code);
+create index if not exists coupon_redemptions_coupon_id_idx on public.coupon_redemptions(coupon_id);
+create index if not exists coupon_redemptions_user_id_idx on public.coupon_redemptions(user_id);
+create index if not exists coupon_redemptions_email_idx on public.coupon_redemptions(email);
+create unique index if not exists coupon_redemptions_payment_unique on public.coupon_redemptions(razorpay_payment_id) where razorpay_payment_id is not null;
 create index if not exists email_events_recipient_email_idx on public.email_events(recipient_email);
 create index if not exists email_events_created_at_idx on public.email_events(created_at desc);
 
@@ -409,6 +476,9 @@ create trigger set_subscriptions_updated_at before update on public.subscription
 drop trigger if exists set_payments_updated_at on public.payments;
 create trigger set_payments_updated_at before update on public.payments for each row execute function public.set_updated_at();
 
+drop trigger if exists set_coupon_codes_updated_at on public.coupon_codes;
+create trigger set_coupon_codes_updated_at before update on public.coupon_codes for each row execute function public.set_updated_at();
+
 alter table public.profiles enable row level security;
 alter table public.company_profiles enable row level security;
 alter table public.competitors enable row level security;
@@ -423,6 +493,8 @@ alter table public.exports enable row level security;
 alter table public.subscriptions enable row level security;
 alter table public.payments enable row level security;
 alter table public.email_events enable row level security;
+alter table public.coupon_codes enable row level security;
+alter table public.coupon_redemptions enable row level security;
 
 drop policy if exists "profiles_select_own" on public.profiles;
 create policy "profiles_select_own" on public.profiles for select using (id = auth.uid() or user_id = auth.uid());
@@ -493,6 +565,9 @@ drop policy if exists "subscriptions_select_own" on public.subscriptions;
 create policy "subscriptions_select_own" on public.subscriptions for select using (user_id = auth.uid());
 drop policy if exists "payments_select_own" on public.payments;
 create policy "payments_select_own" on public.payments for select using (user_id = auth.uid());
+drop policy if exists "coupon_redemptions_select_own" on public.coupon_redemptions;
+create policy "coupon_redemptions_select_own" on public.coupon_redemptions for select using (user_id = auth.uid() or email = auth.email());
+-- Coupon codes and redemption writes are handled server-side with the Supabase service role.
 -- Email events are inserted server-side with the Supabase service role, which bypasses RLS.
 
 -- Supabase service role bypasses RLS by design and should only be used server-side.
