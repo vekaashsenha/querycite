@@ -284,10 +284,10 @@ function ReportDownloadButtons({ report, fullAccess, className = "" }: { report:
   return (
     <div className={`grid gap-3 ${className}`}>
       <button type="button" onClick={() => downloadReportPdf(report, fullAccess)} className="rounded-2xl border border-violet-100 bg-violet-50 p-4 text-left text-sm font-semibold text-violet-900 transition hover:border-violet-300 hover:bg-violet-100">
-        {fullAccess ? "Download full PDF report" : "Download limited free PDF"}
+        {fullAccess ? "Download Full PDF" : "Download Free PDF"}
       </button>
       <button type="button" onClick={() => downloadFindingsCsv(report)} className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-left text-sm font-semibold text-emerald-800 transition hover:border-emerald-300 hover:bg-emerald-100">
-        {fullAccess ? "Download full CSV findings" : "Download basic CSV findings"}
+        {fullAccess ? "Download CSV" : "Download Basic CSV"}
       </button>
     </div>
   );
@@ -557,7 +557,7 @@ function CompetitorComparisonPreview() {
         <h3 className="text-xl font-semibold text-slate-950">Competitor comparison beta preview</h3>
         <StatusPill tone="amber">Beta preview</StatusPill>
       </div>
-      <p className="mt-2 text-sm leading-6 text-slate-600">Competitor comparison beta preview. Saved competitor setup is available in Profile for accounts with verified paid access. Full crawling and scoring will be connected later.</p>
+      <p className="mt-2 text-sm leading-6 text-slate-600">Competitor comparison beta preview. Saved competitor setup is available in Profile for accounts with verified paid access. Competitor scoring is available when competitor audits are enabled for your account.</p>
       <div className="mt-5 grid gap-3">
         {["Competitor AI Visibility Score", "AEO/GEO gap table", "Why AI may recommend them", "Fix priority by competitor gap"].map((item) => (
           <div key={item} className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm font-semibold text-slate-700">
@@ -700,25 +700,56 @@ export function ReportExperience({ isFullDemo, reportId, subscriptionId, hasVeri
   if (!hasFullAccess && !leadSubmitted) {
     return <LeadRequiredState />;
   }
+
+  const schemaReadiness = Math.min(
+    100,
+    report.structuredDataSummary.schemaCount * 12 +
+      (report.structuredDataSummary.hasOrganizationSchema ? 25 : 0) +
+      (report.structuredDataSummary.hasFaqSchema ? 15 : 0) +
+      (report.structuredDataSummary.hasArticleSchema ? 10 : 0),
+  );
+  const priorityFixes = report.findings.filter((finding) => finding.priority === "High").length || topFindings.length;
+  const reportSignals = [
+    ["Overall AI Visibility Score", `${report.scores.aiVisibility}/100`, "Primary readiness score"],
+    ["AI Crawler Readiness Score", `${report.scores.aiCrawlerReadiness}/100`, report.crawlerReadiness.robotsFound ? "robots.txt reviewed" : "robots.txt needs review"],
+    ["Schema Readiness", `${schemaReadiness}/100`, `${report.structuredDataSummary.schemaCount} schema item${report.structuredDataSummary.schemaCount === 1 ? "" : "s"} detected`],
+    ["Content Clarity", `${report.scores.contentReadiness}/100`, `${report.contentSummary.answerStyleSignals} answer signal${report.contentSummary.answerStyleSignals === 1 ? "" : "s"}`],
+    ["llms.txt status", report.llmsTxt.found ? "Found" : "Missing", report.llmsTxt.detail],
+    ["Priority fixes", String(priorityFixes), "High-impact items to review first"],
+  ];
+
   return (
     <main className="px-5 py-14 sm:px-8">
       <section className="mx-auto max-w-7xl">
         {isFullDemo ? <BetaBanner /> : null}
 
-        <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <StatusPill tone={hasFullAccess ? "violet" : "green"}>{isFullDemo ? "Beta full report preview" : hasFullAccess ? "Full report" : "Free report"}</StatusPill>
-            <h1 className="mt-4 text-4xl font-semibold text-slate-950 sm:text-5xl">AI Visibility Audit Report</h1>
-            <p className="mt-3 text-base text-slate-600">Website URL: {report.finalUrl}</p>
-            <p className="mt-1 text-sm text-slate-500">Scanned: {new Date(report.scannedAt).toLocaleString()}</p>
-          </div>
-          <div className="rounded-3xl border border-white/70 bg-white/80 p-4 text-sm leading-6 text-slate-600 shadow-sm">
-            Free checkers show your score. QueryCite turns the score into fixes across crawler access, llms.txt, schema, metadata, content, and technical signals.
+        <div className="mb-8 overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.10)]">
+          <div className="grid gap-0 lg:grid-cols-[0.9fr_1.1fr]">
+            <div className="bg-slate-950 p-6 text-white sm:p-8">
+              <StatusPill tone={hasFullAccess ? "violet" : "green"}>{isFullDemo ? "Beta full report preview" : hasFullAccess ? "Full report" : "Free report"}</StatusPill>
+              <h1 className="mt-5 text-4xl font-semibold leading-tight sm:text-5xl">AI Visibility Audit Report</h1>
+              <p className="mt-4 break-all text-sm font-semibold leading-6 text-slate-300">Website URL: {report.finalUrl}</p>
+              <p className="mt-1 text-sm text-slate-400">Scanned: {new Date(report.scannedAt).toLocaleString()}</p>
+              <div className="mt-8 flex items-end gap-3">
+                <span className="text-7xl font-semibold leading-none">{report.scores.aiVisibility}</span>
+                <span className="pb-2 text-sm font-semibold text-slate-400">/ 100 overall</span>
+              </div>
+              <p className="mt-5 max-w-md text-sm leading-6 text-slate-300">Premium client-ready audit report covering crawler access, llms.txt, schema, metadata, content clarity, priority fixes, and full-report gates.</p>
+            </div>
+            <div className="grid gap-3 p-5 sm:grid-cols-2 sm:p-6 xl:grid-cols-3">
+              {reportSignals.map(([label, value, detail]) => (
+                <div key={label} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</p>
+                  <p className="mt-3 text-2xl font-semibold text-slate-950">{value}</p>
+                  <p className="mt-2 line-clamp-2 text-xs font-medium leading-5 text-slate-500">{detail}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {scoreCards(report).map(([label, , value, tone]) => <ScoreRing key={label} label={label} score={value} tone={tone} />)}
+          {scoreCards(report).slice(1).map(([label, , value, tone]) => <ScoreRing key={label} label={label} score={value} tone={tone} />)}
         </div>
       </section>
 
@@ -746,7 +777,7 @@ export function ReportExperience({ isFullDemo, reportId, subscriptionId, hasVeri
         <SectionHeader
           eyebrow="FULL REPORT PREVIEW"
           title="Unlock the complete AI Visibility Report"
-          description="See the full set of findings, crawler details, llms.txt generator, schema and metadata fixes, developer notes, competitor gaps, AI Advisor, report history, CSV/PDF exports, and weekly tracking when available."
+          description="See the full set of findings, crawler details, llms.txt generator, schema and metadata fixes, developer notes, competitor gaps, AI Advisor, report history, CSV/PDF exports, and share-ready report options."
         />
 
         {hasFullAccess ? (
@@ -796,13 +827,13 @@ export function ReportExperience({ isFullDemo, reportId, subscriptionId, hasVeri
               <AdvisorChat currentReportData={report} planType="free" />
             </div>
             <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {["Full findings", "AI Crawler Readiness details", "llms.txt generator", "Schema and metadata fixes", "Developer notes", "Competitor gaps", "AI Visibility Advisor", "Report history", "CSV/PDF exports", "Weekly tracking later"].map((section) => (
+              {["Full findings", "AI Crawler Readiness details", "llms.txt generator", "Schema and metadata fixes", "Developer notes", "Competitor gaps", "AI Visibility Advisor", "Report history", "CSV/PDF exports", "Share-ready report options"].map((section) => (
                 <LockedPanel key={section} title={section} description="Available in the full report" />
               ))}
             </div>
             <div className="mt-8 text-center">
               <Link href="/contact" className="inline-flex min-h-12 items-center justify-center rounded-full bg-slate-950 px-6 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(15,23,42,0.18)] transition hover:-translate-y-0.5 hover:bg-slate-800">
-                Join private beta
+                Unlock full report
               </Link>
             </div>
           </>

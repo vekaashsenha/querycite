@@ -178,7 +178,7 @@ export async function POST(request: Request) {
     const incoming = (body.competitors || []).map(normalizeCompetitor).filter(Boolean) as Array<ReturnType<typeof normalizeCompetitor> & Record<string, unknown>>;
 
     if (incoming.length > 3) {
-      return NextResponse.json({ error: "MVP competitor setup allows up to 3 competitors." }, { status: 400 });
+      return NextResponse.json({ error: "Current competitor setup allows up to 3 competitors." }, { status: 400 });
     }
 
     const companyProfile = await ensureCompanyProfile(user.id, subscriptionId, access.email ?? user.email, access.websiteUrl);

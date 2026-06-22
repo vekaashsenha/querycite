@@ -73,20 +73,24 @@ To apply it:
 The schema prepares profiles, company profiles, competitors, audits, reports, Advisor messages, credit usage, feedback, exports, subscriptions, payments, and Razorpay Test Mode webhook storage.
 ## Supabase Auth
 
-QueryCite uses Supabase Auth email/password for `/signup`, `/login`, `/auth/callback`, and logout. Email confirmation should remain enabled in Supabase.
+QueryCite uses Supabase Auth email/password for `/signup`, `/login`, `/forgot-password`, `/reset-password`, `/auth/callback`, and logout. Email confirmation and password recovery should remain enabled in Supabase.
 
 Configured redirect URLs should include:
 
 ```bash
 https://www.querycite.com/auth/callback
+https://www.querycite.com/forgot-password
+https://www.querycite.com/reset-password
 https://www.querycite.com/login
 https://www.querycite.com/dashboard
 http://localhost:3000/auth/callback
+http://localhost:3000/forgot-password
+http://localhost:3000/reset-password
 http://localhost:3000/login
 http://localhost:3000/dashboard
 ```
 
-Authenticated users are mapped to `profiles`, previous lead/report rows by matching email, and verified subscription/payment rows by `user_id` or email. Free report links with `reportId` remain viewable without login, but dashboard, profile, billing, competitor management, full downloads, and paid Advisor access require login plus verified paid access.
+Authenticated users are mapped to `profiles`, previous lead/report rows by matching email, and verified subscription/payment rows by `user_id` or email. Free report links with `reportId` remain viewable without login, but dashboard, profile, billing, competitor management, full downloads, and paid Advisor access require login plus verified paid access. Password reset emails must redirect to `/reset-password` so the app can update the password from the Supabase recovery session.
 
 ## What Works Now
 

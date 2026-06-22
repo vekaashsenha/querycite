@@ -76,7 +76,7 @@ export function ContactForm() {
         </p>
       ) : null}
       <p className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-xs font-semibold leading-5 text-slate-600">
-        Feedback is saved to the private beta backend when Supabase environment variables are configured. If submission fails, use the email fallback.
+        Feedback is saved securely when the feedback system is available. If submission fails, use the email fallback.
       </p>
     </form>
   );

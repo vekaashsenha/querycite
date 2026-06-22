@@ -72,6 +72,23 @@ export function authCallbackUrl(request?: Request) {
   return `${appBaseUrl(request)}/auth/callback`;
 }
 
+function requestBaseUrl(request?: Request) {
+  if (!request) return appBaseUrl();
+  const host = request.headers.get("x-forwarded-host") || request.headers.get("host");
+  const protocol = request.headers.get("x-forwarded-proto") || (host?.includes("localhost") || host?.includes("127.0.0.1") ? "http" : "https");
+  return host ? `${protocol}://${host}` : appBaseUrl();
+}
+
+function passwordResetBaseUrl(request?: Request) {
+  const requestUrl = requestBaseUrl(request);
+  if (/localhost|127\.0\.0\.1/i.test(requestUrl)) return requestUrl.replace(/\/$/, "");
+  return appBaseUrl(request).replace(/\/$/, "");
+}
+
+export function passwordResetUrl(request?: Request) {
+  return `${passwordResetBaseUrl(request)}/reset-password`;
+}
+
 function cookieOptions(maxAge: number) {
   return {
     httpOnly: true,
@@ -114,7 +131,7 @@ async function readAuthError(response: Response, fallback: string) {
   const normalized = detail.toLowerCase();
   if (normalized.includes("email not confirmed")) return "Please confirm your email before logging in.";
   if (normalized.includes("invalid login") || normalized.includes("invalid credentials")) return "Invalid login. Please check your email and password.";
-  if (normalized.includes("already registered") || normalized.includes("already exists")) return "An account already exists for this email. Please log in.";
+  if (normalized.includes("already registered") || normalized.includes("already exists") || normalized.includes("user already")) return "This email may already be registered. Please login or reset your password.";
   if (normalized.includes("password")) return detail || "Please use a stronger password.";
   return detail || fallback;
 }
@@ -151,6 +168,38 @@ export async function signInWithPassword(email: string, password: string) {
   }
 
   return await response.json() as SupabaseAuthSession;
+}
+export async function sendPasswordResetEmail(request: Request, email: string) {
+  const base = authBaseUrl();
+  if (!base) throw new Error("Supabase Auth is not configured.");
+
+  const response = await fetch(`${base}/recover?redirect_to=${encodeURIComponent(passwordResetUrl(request))}`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({ email }),
+  });
+
+  if (!response.ok) {
+    throw new Error(await readAuthError(response, "Password reset email could not be sent right now."));
+  }
+}
+
+export async function updatePasswordWithAccessToken(accessToken: string, password: string) {
+  const base = authBaseUrl();
+  if (!base) throw new Error("Supabase Auth is not configured.");
+
+  const response = await fetch(`${base}/user`, {
+    method: "PUT",
+    headers: authHeaders(accessToken),
+    body: JSON.stringify({ password }),
+  });
+
+  if (!response.ok) {
+    throw new Error(await readAuthError(response, "Password could not be updated. Please request a new reset link."));
+  }
+
+  const user = await response.json() as SupabaseAuthUser;
+  return toQueryCiteUser(user);
 }
 
 export async function getUserFromAccessToken(accessToken: string) {

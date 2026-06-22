@@ -28,8 +28,8 @@ export default async function PaymentSuccessPage({ searchParams }: PaymentSucces
         {subscriptionId ? <p className="mt-4 break-all text-sm leading-6 text-slate-600">Subscription ID: {subscriptionId}</p> : null}
         <p className="mt-4 text-sm leading-6 text-slate-600">
           {isOrderTest
-            ? "This one-time test payment validates checkout, webhook, Supabase records, and email flow. It does not unlock long-term paid subscription access."
-            : "This page does not activate paid access by itself. QueryCite uses verified Razorpay webhooks and Supabase subscription status as the source of truth."}
+            ? "This one-time test payment validates checkout and receipt flow. It does not unlock long-term subscription access."
+            : "This page does not activate paid access by itself. QueryCite uses verified payment and subscription records as the source of truth."}
         </p>
         <div className="mt-7 flex flex-wrap justify-center gap-3">
           <PrimaryLink href="/dashboard">Go to Dashboard</PrimaryLink>

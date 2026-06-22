@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ClayCard, PageIntro, StatusPill } from "@/components/ui";
+import { DashboardShell, WorkspaceHeader } from "@/components/DashboardShell";
+import { AppCard, EmptyState, MetricCard, StatusPill } from "@/components/ui";
 import { formatPaise, getPaidAccessContextForUser, getPaymentHistoryForUser } from "@/lib/paid-foundation";
 import { requireAuthenticatedUser, syncAuthenticatedUser } from "@/lib/auth/server";
 
@@ -15,18 +16,22 @@ export default async function BillingPage() {
   const payments = await getPaymentHistoryForUser(user);
 
   return (
-    <main className="px-5 py-16 sm:px-8">
-      <PageIntro
-        eyebrow="Billing"
-        title="Billing and payment status"
-        description="Billing data is visible only after login and is based on verified Razorpay webhook records stored in Supabase. Payment success pages do not unlock access by themselves."
-      />
-      <section className="mx-auto mt-10 grid max-w-7xl gap-6 lg:grid-cols-[0.85fr_1.15fr]">
-        <ClayCard>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-2xl font-semibold text-slate-950">Billing overview</h2>
-            <StatusPill tone={access.verifiedPaidAccess ? "green" : "amber"}>{access.verifiedPaidAccess ? "Verified" : "No active access"}</StatusPill>
-          </div>
+    <DashboardShell
+      user={{ email: user.email, name: user.name }}
+      title="Billing"
+      description="Plan status, billing period, payment history, and support options based on verified account records."
+      badge={<StatusPill tone={access.verifiedPaidAccess ? "green" : "amber"}>{access.verifiedPaidAccess ? "Verified" : "No active access"}</StatusPill>}
+    >
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4" id="usage">
+        <MetricCard label="Current plan" value={access.rawPlanName || access.planName} detail="Shown from subscription records" tone="violet" />
+        <MetricCard label="Payment status" value={access.status} detail={access.verifiedPaidAccess ? "Paid access allowed" : "Full access locked"} tone={access.verifiedPaidAccess ? "green" : "amber"} />
+        <MetricCard label="Billing period" value={formatDate(access.currentPeriodEnd)} detail={`Starts ${formatDate(access.currentPeriodStart)}`} tone="cyan" />
+        <MetricCard label="Renewal date" value={formatDate(access.renewalDate)} detail="For billing changes, contact support" tone="slate" />
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
+        <AppCard className="p-6">
+          <WorkspaceHeader eyebrow="Billing overview" title="Current access details" description="Payment success pages do not unlock long-term access by themselves. Access is based on verified payment and subscription records." />
           <div className="mt-6 grid gap-3">
             {[
               ["Signed in", user.email],
@@ -43,18 +48,18 @@ export default async function BillingPage() {
               </div>
             ))}
           </div>
-          {!access.verifiedPaidAccess ? <p className="mt-5 rounded-2xl border border-amber-100 bg-amber-50 p-4 text-sm font-semibold leading-6 text-amber-900">No active paid subscription is linked to this account yet.</p> : null}
+          <p className="mt-5 rounded-2xl border border-amber-100 bg-amber-50 p-4 text-sm font-semibold leading-6 text-amber-900">For billing changes, contact support.</p>
           <div className="mt-5 flex flex-wrap gap-3">
             <Link href="/pricing" className="inline-flex min-h-11 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-semibold text-white">View plans</Link>
             <Link href="/contact" className="inline-flex min-h-11 items-center justify-center rounded-full border border-slate-300 bg-white px-5 text-sm font-semibold text-slate-900">Contact support</Link>
           </div>
-        </ClayCard>
+        </AppCard>
 
-        <ClayCard>
-          <h2 className="text-2xl font-semibold text-slate-950">Payment history</h2>
+        <AppCard className="p-6">
+          <WorkspaceHeader eyebrow="Payment history" title="Recorded payments" description="Rows are shown only when payment records are linked to this authenticated account." />
           {payments.length ? (
-            <div className="mt-5 overflow-hidden rounded-3xl border border-slate-100">
-              <div className="grid gap-3 bg-slate-950 px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-white md:grid-cols-[0.65fr_0.6fr_0.55fr_0.7fr_1fr]">
+            <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200">
+              <div className="hidden bg-slate-950 px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-white md:grid md:grid-cols-[0.65fr_0.6fr_0.55fr_0.7fr_1fr]">
                 <span>Date</span><span>Amount</span><span>Status</span><span>Plan</span><span>Invoice/receipt</span>
               </div>
               {payments.map((payment) => (
@@ -68,11 +73,10 @@ export default async function BillingPage() {
               ))}
             </div>
           ) : (
-            <p className="mt-5 rounded-2xl border border-slate-100 bg-slate-50 p-5 text-sm font-semibold text-slate-600">No payment history rows are linked to this authenticated account yet.</p>
+            <div className="mt-6"><EmptyState title="No payment history yet" description="No payment records are linked to this authenticated account yet. Payment records will appear here after processing." /></div>
           )}
-          <p className="mt-5 rounded-2xl border border-slate-100 bg-slate-50 p-4 text-xs font-semibold leading-5 text-slate-600">Subscription billing is still handled through verified server-side records. For billing changes, contact support.</p>
-        </ClayCard>
+        </AppCard>
       </section>
-    </main>
+    </DashboardShell>
   );
 }

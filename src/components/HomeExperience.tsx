@@ -8,7 +8,7 @@ import { normalizeWebsiteUrl, urlErrorMessage } from "@/lib/url";
 import { ClayCard, LockedPanel, PrimaryLink, ScoreRing, SectionHeader, StatusPill } from "@/components/ui";
 
 const scanSteps = ["Fetching homepage", "Checking crawler and llms.txt signals", "Scoring AEO/GEO readiness", "Preparing fix-ready report"];
-const valueItems = ["AEO/GEO fixes", "AI crawler readiness", "llms.txt guidance", "Export-ready reports"];
+const valueItems = ["AI Crawler Readiness", "Schema & Content Clarity", "Competitor Gaps", "Ready-to-Paste Fixes", "AI Visibility Advisor"];
 const problemCards = [
   ["AI search cannot explain you clearly", "Weak entity signals make it harder for AI systems to identify what your brand does and who it serves."],
   ["Pages are not answer-ready", "Useful content often lacks concise answers, FAQs, proof points, and structure that AI can summarize."],
@@ -143,7 +143,7 @@ function LeadCaptureModal({ report, onSuccess }: { report: WebsiteAuditReport; o
 
           <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-semibold leading-6 text-slate-700">
             <input type="checkbox" checked={privacyAccepted} onChange={(event) => setPrivacyAccepted(event.target.checked)} className="mt-1 size-4 rounded border-slate-300" />
-            <span>I agree to the <Link href="/privacy" className="text-violet-700 underline">Privacy Policy</Link> and <Link href="/terms" className="text-violet-700 underline">Terms of Use</Link>.</span>
+            <span>I agree to the <Link href="/privacy-policy" className="text-violet-700 underline">Privacy Policy</Link> and <Link href="/terms" className="text-violet-700 underline">Terms of Use</Link>.</span>
           </label>
 
           <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-sm font-semibold leading-6 text-slate-700">
@@ -364,14 +364,19 @@ export function HomeExperience() {
         <div className="mx-auto grid w-full max-w-7xl gap-12 lg:grid-cols-[1fr_0.86fr] lg:items-center">
           <div>
             <h1 className="max-w-5xl text-5xl font-semibold leading-[1.02] tracking-normal text-slate-950 sm:text-6xl lg:text-7xl">
-              Find why AI search is ignoring your brand.
+              Find why AI search is not citing your brand, then get ready-to-use AEO/GEO fixes.
             </h1>
             <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-700">
-              QueryCite helps brands find why AI search is not citing or recommending them, then generates ready-to-use AEO/GEO fixes.
+              QueryCite audits your website for AI crawler readiness, entity clarity, structured data, answer coverage, and practical AEO/GEO fix opportunities.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
+              <Link href="/#audit" className="inline-flex min-h-12 items-center justify-center rounded-full bg-slate-950 px-6 text-sm font-semibold text-white shadow-lg shadow-slate-950/10 transition hover:-translate-y-0.5 hover:bg-slate-800">Run Free AI Visibility Audit</Link>
+              <Link href="/report?demo=full" className="inline-flex min-h-12 items-center justify-center rounded-full border border-slate-300 bg-white px-6 text-sm font-semibold text-slate-900 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-950">View Sample Report</Link>
+            </div>
+            <div className="mt-6 flex flex-wrap gap-3">
               {valueItems.map((item) => <StatusPill key={item} tone="slate">{item}</StatusPill>)}
             </div>
+            <p className="mt-5 max-w-2xl rounded-2xl border border-slate-200 bg-white/85 p-4 text-xs font-semibold leading-5 text-slate-600">QueryCite improves AI visibility readiness. It does not guarantee rankings, traffic, or AI citations.</p>
           </div>
 
           <div className="grid gap-5">
@@ -407,7 +412,7 @@ export function HomeExperience() {
       </section>
 
       <section className="px-5 pb-10 sm:px-8">
-        <div className="mx-auto grid max-w-7xl gap-3 rounded-3xl border border-white/70 bg-white/78 p-4 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mx-auto grid max-w-7xl gap-3 rounded-3xl border border-white/70 bg-white/78 p-4 shadow-sm sm:grid-cols-2 lg:grid-cols-5">
           {valueItems.map((item) => <div key={item} className="rounded-2xl bg-white p-4 text-center text-sm font-semibold text-slate-700">{item}</div>)}
         </div>
       </section>
@@ -457,13 +462,12 @@ export function HomeExperience() {
       </section>
 
       <section id="how-it-works" className="px-5 py-16 sm:px-8">
-        <SectionHeader eyebrow="How it works" title="From URL to report preview" description="Enter a URL, review the scan progress, then see scores, findings, and full-report preview sections." />
-        <div className="mx-auto mt-10 grid max-w-7xl gap-5 md:grid-cols-4">
+        <SectionHeader eyebrow="How it works" title="From URL to action plan" description="Enter a website, get an AI visibility report, then apply AEO/GEO fixes with your marketing, content, and developer teams." />
+        <div className="mx-auto mt-10 grid max-w-7xl gap-5 md:grid-cols-3">
           {[
-            ["Enter website URL", "Add your website domain or full URL to start the audit flow."],
-            ["Scan AI visibility signals", "Review answer readiness, entity clarity, proof, schema, and report signals."],
-            ["Get report and fixes", "See scores, findings, and recommended next actions in a clean report."],
-            ["Unlock full report", "Preview deeper findings, advisor notes, developer notes, and exports."],
+            ["Enter your website", "Add your domain or full URL to start the audit flow."],
+            ["Get AI visibility report", "Review AI crawler readiness, schema clarity, content signals, and priority gaps."],
+            ["Apply AEO/GEO fixes", "Use recommendations, developer notes, and ready-to-paste fixes to improve readiness."],
           ].map(([step, description], index) => (
             <ClayCard key={step}>
               <div className="text-4xl font-semibold leading-none text-violet-700">0{index + 1}</div>
@@ -475,7 +479,7 @@ export function HomeExperience() {
       </section>
 
       <section id="use-cases" className="px-5 py-16 sm:px-8">
-        <SectionHeader eyebrow="Use cases" title="Built for teams responsible for AI search readiness" description="QueryCite is designed for practical brand, content, SEO, and agency workflows without promising citations or rankings." />
+        <SectionHeader eyebrow="Built for" title="Built for teams responsible for AI search readiness" description="QueryCite is designed for practical brand, content, SEO, and agency workflows without promising citations or rankings." />
         <div className="mx-auto mt-10 grid max-w-7xl gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {useCases.map(([title, description]) => (
             <ClayCard key={title}>

@@ -20,10 +20,10 @@ export const featureCards = [
 
 export const useCases = [
   ["For SaaS Brands", "Find why AI search is not mentioning your product and fix weak citation signals."],
-  ["For B2B Service Companies", "Improve answer-ready pages, service positioning, and entity clarity for AI discovery."],
   ["For Agencies", "Run AI visibility audits for clients and export branded reports."],
-  ["For SEO Teams", "Move beyond keyword rankings into answer readiness, citation readiness, and AI search visibility."],
-  ["For Content Teams", "Turn AEO/GEO gaps into clear content briefs and ready-to-paste improvements."],
+  ["For D2C Brands", "Identify content, proof, and structured clarity gaps that can weaken AI search readiness."],
+  ["For B2B Service Companies", "Improve answer-ready pages, service positioning, and entity clarity for AI discovery."],
+  ["For Marketing Teams", "Turn AEO/GEO gaps into clear content briefs and ready-to-paste improvements."],
   ["For Founders", "Understand whether AI engines can clearly explain what your company does and why it matters."],
 ];
 
@@ -41,7 +41,7 @@ export const faqs = [
   ["Does QueryCite guarantee AI citations?", "No. QueryCite does not guarantee citations, rankings, traffic, or revenue. It helps identify visibility gaps and generate practical fixes that improve AI search readiness."],
   ["What is AEO?", "AEO means Answer Engine Optimization. It helps your content become easier for answer engines to understand, summarize, and use."],
   ["What is GEO?", "GEO means Generative Engine Optimization. It focuses on making your brand, content, and website more discoverable and citation-ready for generative AI search experiences."],
-  ["Who is QueryCite for?", "QueryCite is for SaaS brands, B2B companies, agencies, SEO teams, content teams, and founders."],
+  ["Who is QueryCite for?", "QueryCite is for SaaS brands, agencies, D2C brands, B2B service companies, marketing teams, and founders."],
   ["What do I get in the free report?", "The free report includes basic AI Visibility, AEO/GEO scores, top findings, and limited export options."],
   ["What is unlocked in the full report?", "The full report unlocks all findings, AI crawler details, llms.txt guidance, competitor comparison, AI Visibility Advisor, ready-to-paste fixes, developer notes, full PDF/CSV exports, and full shareable report."],
   ["Are integrations live?", "Only integrations clearly marked as Live Now should be treated as available. Beta Testing and Coming Soon items are roadmap indicators only."],

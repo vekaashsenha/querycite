@@ -4,6 +4,8 @@ import { cleanAuthEmail, cleanAuthText, safeReturnPath, setSessionCookies, signU
 export const runtime = "nodejs";
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const signupGuidance = "If this email is already registered, please login or reset your password.";
+const duplicateGuidance = "This email may already be registered. Please login or reset your password.";
 
 export async function POST(request: Request) {
   try {
@@ -18,7 +20,7 @@ export async function POST(request: Request) {
     if (password.length < 8) return NextResponse.json({ error: "Password must be at least 8 characters." }, { status: 400 });
 
     const session = await signUpWithPassword(request, name, email, password);
-    const response = NextResponse.json({ ok: true, next, confirmationRequired: !session.access_token, message: session.access_token ? "Signup complete." : "Check your email to confirm your QueryCite account, then log in." });
+    const response = NextResponse.json({ ok: true, next, confirmationRequired: !session.access_token, message: session.access_token ? "Signup complete." : signupGuidance });
     const user = userFromSession(session);
 
     if (session.access_token) {
@@ -31,6 +33,10 @@ export async function POST(request: Request) {
     return response;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Signup could not be completed right now.";
+    const normalized = message.toLowerCase();
+    if (normalized.includes("already") || normalized.includes("registered")) {
+      return NextResponse.json({ ok: true, next: "/login", confirmationRequired: true, message: duplicateGuidance });
+    }
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }

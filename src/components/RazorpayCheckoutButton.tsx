@@ -152,7 +152,7 @@ export function RazorpayCheckoutButton({ plan, mode = "order", name, email, webs
         {isLoading ? "Opening test payment..." : isOrderMode ? "Start Test Payment" : "Start Test Checkout"}
       </button>
       <p className="text-xs font-semibold leading-5 text-slate-500">
-        {isOrderMode ? "Subscription billing is being tested separately. This test payment validates checkout, webhook, Supabase records, and email flow." : "Payment flow is currently in test mode for private validation."}
+        {isOrderMode ? "Subscription billing is being tested separately. This test payment validates checkout and receipt flow." : "Payment flow is currently available for private validation."}
       </p>
       {error ? <p className="rounded-2xl border border-amber-100 bg-amber-50 p-3 text-xs font-semibold leading-5 text-amber-900">{error}</p> : null}
     </div>
