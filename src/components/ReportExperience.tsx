@@ -12,6 +12,7 @@ type ReportExperienceProps = {
   reportId?: string | null;
   subscriptionId?: string | null;
   hasVerifiedFullAccess?: boolean;
+  isAdminPreview?: boolean;
   paidPlanName?: PaidPlanName;
 };
 
@@ -260,6 +261,20 @@ function BetaBanner() {
         <Link href="/contact" className="inline-flex min-h-11 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(15,23,42,0.18)] transition hover:-translate-y-0.5 hover:bg-slate-800">
           Share Feedback
         </Link>
+      </div>
+    </div>
+  );
+}
+
+function AdminPreviewBanner() {
+  return (
+    <div className="mb-8 rounded-3xl border border-cyan-200 bg-cyan-50 p-5 shadow-sm">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-800">Admin preview</p>
+          <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-800">Admin preview: full features visible for QA.</p>
+        </div>
+        <StatusPill tone="cyan">QA mode</StatusPill>
       </div>
     </div>
   );
@@ -647,7 +662,7 @@ function parseStoredReport(storedReport: string) {
   }
 }
 
-export function ReportExperience({ isFullDemo, reportId, subscriptionId, hasVerifiedFullAccess = false, paidPlanName = "free" }: ReportExperienceProps) {
+export function ReportExperience({ isFullDemo, reportId, subscriptionId, hasVerifiedFullAccess = false, isAdminPreview = false, paidPlanName = "free" }: ReportExperienceProps) {
   const storedReport = useSyncExternalStore(subscribeToReportStorage, getStoredReportSnapshot, getServerReportSnapshot);
   const storedReportObject = useMemo(() => parseStoredReport(storedReport), [storedReport]);
   const leadSubmittedSnapshot = useSyncExternalStore(subscribeToLeadStorage, getLeadSubmittedSnapshot, getServerLeadSubmittedSnapshot);
@@ -659,7 +674,7 @@ export function ReportExperience({ isFullDemo, reportId, subscriptionId, hasVeri
   const topFindings = useMemo(() => report?.findings.slice(0, 3) ?? [], [report]);
   const topFixes = useMemo(() => report?.fixes.slice(0, 3) ?? [], [report]);
   const isPaidUser = hasSavedReportLink ? remoteAccessLevel === "full" : hasVerifiedFullAccess;
-  const hasFullAccess = isPaidUser || isFullDemo;
+  const hasFullAccess = isPaidUser || isFullDemo || isAdminPreview;
   const leadSubmitted = isFullDemo || hasSavedReportLink || leadSubmittedSnapshot === "true";
 
   useEffect(() => {
@@ -722,11 +737,12 @@ export function ReportExperience({ isFullDemo, reportId, subscriptionId, hasVeri
     <main className="px-5 py-14 sm:px-8">
       <section className="mx-auto max-w-7xl">
         {isFullDemo ? <BetaBanner /> : null}
+        {isAdminPreview ? <AdminPreviewBanner /> : null}
 
         <div className="mb-8 overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.10)]">
           <div className="grid gap-0 lg:grid-cols-[0.9fr_1.1fr]">
             <div className="bg-slate-950 p-6 text-white sm:p-8">
-              <StatusPill tone={hasFullAccess ? "violet" : "green"}>{isFullDemo ? "Beta full report preview" : hasFullAccess ? "Full report" : "Free report"}</StatusPill>
+              <StatusPill tone={hasFullAccess ? "violet" : "green"}>{isAdminPreview ? "Admin preview" : isFullDemo ? "Beta full report preview" : hasFullAccess ? "Full report" : "Free report"}</StatusPill>
               <h1 className="mt-5 text-4xl font-semibold leading-tight sm:text-5xl">AI Visibility Audit Report</h1>
               <p className="mt-4 break-all text-sm font-semibold leading-6 text-slate-300">Website URL: {report.finalUrl}</p>
               <p className="mt-1 text-sm text-slate-400">Scanned: {new Date(report.scannedAt).toLocaleString()}</p>
@@ -795,7 +811,7 @@ export function ReportExperience({ isFullDemo, reportId, subscriptionId, hasVeri
                 <h3 className="text-2xl font-semibold text-slate-950">All findings</h3>
                 <div className="mt-5 grid gap-3">{report.findings.map((finding, index) => <FindingCard key={finding.issue} finding={finding} index={index} />)}</div>
               </ClayCard>
-              <AdvisorChat currentReportData={report} planType={isFullDemo ? "betaFullReport" : paidPlanName} subscriptionId={subscriptionId} reportId={report.reportId ?? reportId} resetDate={null} />
+              <AdvisorChat currentReportData={report} planType={isAdminPreview ? "adminQa" : isFullDemo ? "betaFullReport" : paidPlanName} subscriptionId={subscriptionId} reportId={report.reportId ?? reportId} resetDate={null} />
             </div>
             <div className="grid gap-6 lg:grid-cols-2">
               <CompetitorSetupFoundation />

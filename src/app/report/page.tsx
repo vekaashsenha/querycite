@@ -22,5 +22,5 @@ export default async function ReportPage({ searchParams }: ReportPageProps) {
     await syncAuthenticatedUser(user);
   }
 
-  return <ReportExperience isFullDemo={isFullDemo} reportId={reportId} subscriptionId={paidAccess?.subscriptionId ?? null} hasVerifiedFullAccess={Boolean(paidAccess?.verifiedPaidAccess)} paidPlanName={paidAccess?.planName ?? "free"} />;
+  return <ReportExperience isFullDemo={isFullDemo} reportId={reportId} subscriptionId={paidAccess?.subscriptionId ?? null} hasVerifiedFullAccess={Boolean(paidAccess?.verifiedPaidAccess)} isAdminPreview={Boolean(paidAccess?.qaAccess)} paidPlanName={paidAccess?.planName ?? "free"} />;
 }

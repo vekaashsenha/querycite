@@ -41,6 +41,10 @@ type ReportRow = {
   audit_id?: string | null;
 };
 
+type ProfileRoleRow = {
+  role?: string | null;
+};
+
 function authBaseUrl() {
   const config = getSupabaseServerConfig();
   if (!config) return null;
@@ -101,6 +105,39 @@ function cookieOptions(maxAge: number) {
 
 function normalizeEmail(value: unknown) {
   return typeof value === "string" ? value.trim().toLowerCase() : "";
+}
+
+function adminEmailAllowlist() {
+  const envEmails = (process.env.QUERYCITE_ADMIN_EMAILS || "")
+    .split(",")
+    .map((email) => normalizeEmail(email))
+    .filter(Boolean);
+  return new Set(["vekaashsenha@gmail.com", ...envEmails]);
+}
+
+function isAdminEmail(email: string) {
+  return adminEmailAllowlist().has(normalizeEmail(email));
+}
+
+export async function isAdminUser(user: QueryCiteUser | null | undefined) {
+  if (!user) return false;
+  const email = normalizeEmail(user.email);
+
+  if (isSupabaseAdminConfigured()) {
+    try {
+      const rows = await selectSupabaseRows<ProfileRoleRow>("profiles", {
+        select: "role",
+        or: `(id.eq.${user.id},user_id.eq.${user.id},email.eq.${email})`,
+        order: "updated_at.desc",
+        limit: "1",
+      });
+      if (rows[0]?.role === "admin") return true;
+    } catch (error) {
+      console.error("Admin role lookup failed", error);
+    }
+  }
+
+  return isAdminEmail(email);
 }
 
 function compactText(value: unknown, max = 180) {
@@ -263,7 +300,6 @@ export async function syncAuthenticatedUser(user: QueryCiteUser, name?: string |
       email: user.email,
       name: displayName,
       full_name: displayName,
-      role: "owner",
       onboarding_status: "started",
       updated_at: now,
       created_at: now,

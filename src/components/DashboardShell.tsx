@@ -7,6 +7,7 @@ import { ReactNode, useState } from "react";
 type DashboardUser = {
   email: string;
   name?: string | null;
+  isAdmin?: boolean;
 };
 
 type NavItem = {
@@ -102,6 +103,7 @@ function AccountMenu({ user }: { user: DashboardUser }) {
         <span className="hidden leading-tight sm:block">
           <span className="block text-sm font-semibold text-slate-950">{displayName}</span>
           <span className="block max-w-48 truncate text-xs font-medium text-slate-500">{user.email}</span>
+          {user.isAdmin ? <span className="mt-1 inline-flex rounded-full border border-cyan-200 bg-cyan-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-cyan-800">Admin preview</span> : null}
         </span>
       </button>
       {open ? (
@@ -109,6 +111,7 @@ function AccountMenu({ user }: { user: DashboardUser }) {
           <div className="border-b border-slate-100 p-4">
             <p className="text-sm font-semibold text-slate-950">{displayName}</p>
             <p className="mt-1 truncate text-xs font-medium text-slate-500">{user.email}</p>
+            {user.isAdmin ? <p className="mt-2 inline-flex rounded-full border border-cyan-200 bg-cyan-50 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-cyan-800">QA mode</p> : null}
           </div>
           <div className="grid p-2 text-sm font-semibold text-slate-700">
             {[

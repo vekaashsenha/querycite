@@ -7,6 +7,7 @@ import { useState } from "react";
 type HeaderUser = {
   email: string;
   name?: string | null;
+  isAdmin?: boolean;
 } | null;
 
 const workspaceRoutes = ["/dashboard", "/reports", "/profile", "/billing", "/account"];
@@ -52,12 +53,14 @@ function AccountMenu({ user, onNavigate }: { user: HeaderUser; onNavigate?: () =
       >
         <span className="grid size-7 place-items-center rounded-full bg-slate-950 text-[10px] font-black text-white">QC</span>
         <span className="hidden max-w-28 truncate sm:block">{displayName}</span>
+        {user.isAdmin ? <span className="hidden rounded-full border border-cyan-200 bg-cyan-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-cyan-800 sm:inline-flex">Admin</span> : null}
       </button>
       {open ? (
         <div className="absolute right-0 z-30 mt-3 w-72 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/15">
           <div className="border-b border-slate-100 p-4">
             <p className="text-sm font-semibold text-slate-950">{displayName}</p>
             <p className="mt-1 truncate text-xs font-medium text-slate-500">{user.email}</p>
+            {user.isAdmin ? <p className="mt-2 inline-flex rounded-full border border-cyan-200 bg-cyan-50 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-cyan-800">Admin preview</p> : null}
           </div>
           <div className="grid p-2 text-sm font-semibold text-slate-700">
             {[

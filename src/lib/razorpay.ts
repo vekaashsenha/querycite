@@ -1,4 +1,4 @@
-import crypto from "node:crypto";
+﻿import crypto from "node:crypto";
 
 export type RazorpayPlanName = "starter" | "pro" | "agency";
 
@@ -8,6 +8,16 @@ export type RazorpaySubscriptionInput = {
   email?: string;
   websiteUrl?: string;
   companyName?: string;
+};
+
+export type RazorpayOrderInput = RazorpaySubscriptionInput & {
+  amount?: number;
+  couponCode?: string;
+  couponFinalAmount?: number;
+  couponType?: string;
+  paymentType?: "one_time_beta" | "one_time_test";
+  userId?: string;
+  accessDurationDays?: number;
 };
 
 export type RazorpaySubscriptionCheckoutData = {
@@ -26,6 +36,7 @@ export type RazorpayOrderCheckoutData = {
   amount: number;
   currency: "INR";
   plan_name: RazorpayPlanName;
+  notes: Record<string, string>;
   prefill: {
     name?: string;
     email?: string;
@@ -131,10 +142,32 @@ export async function createRazorpaySubscription(input: RazorpaySubscriptionInpu
   };
 }
 
-export async function createRazorpayOrder(input: RazorpaySubscriptionInput): Promise<RazorpayOrderCheckoutData> {
+export async function createRazorpayOrder(input: RazorpayOrderInput): Promise<RazorpayOrderCheckoutData> {
   assertRazorpayServerConfigured();
   const keyId = getRazorpayPublicKeyId();
-  const amount = getOneTimeOrderAmount(input.plan);
+  const amount = input.amount ?? getOneTimeOrderAmount(input.plan);
+  const couponCode = input.couponCode || "";
+  const paymentType = input.paymentType || "one_time_beta";
+  const accessDurationDays = input.accessDurationDays ?? 30;
+  const notes: Record<string, string> = {
+    product: "querycite",
+    payment_type: paymentType,
+    plan_name: input.plan,
+    selected_plan: input.plan,
+    website_url: input.websiteUrl || "",
+    company_name: input.companyName || "",
+    source: "querycite_pricing",
+    access_duration_days: String(accessDurationDays),
+    user_email: input.email || "",
+    email: input.email || "",
+    user_id: input.userId || "",
+  };
+
+  if (couponCode) {
+    notes.coupon_code = couponCode;
+    notes.coupon_final_amount = String(input.couponFinalAmount ?? amount);
+    notes.coupon_type = input.couponType || "iima_beta";
+  }
 
   const response = await fetch(`${razorpayApiBase}/orders`, {
     method: "POST",
@@ -146,14 +179,7 @@ export async function createRazorpayOrder(input: RazorpaySubscriptionInput): Pro
       amount,
       currency: "INR",
       receipt: `querycite_${input.plan}_${Date.now()}`.slice(0, 40),
-      notes: {
-        product: "querycite",
-        payment_type: "one_time_test",
-        plan_name: input.plan,
-        website_url: input.websiteUrl || "",
-        company_name: input.companyName || "",
-        source: "querycite_pricing",
-      },
+      notes,
     }),
   });
 
@@ -169,6 +195,7 @@ export async function createRazorpayOrder(input: RazorpaySubscriptionInput): Pro
     amount: typeof data.amount === "number" ? data.amount : amount,
     currency: "INR",
     plan_name: input.plan,
+    notes,
     prefill: {
       name: input.name,
       email: input.email,

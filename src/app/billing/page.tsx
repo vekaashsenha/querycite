@@ -17,14 +17,14 @@ export default async function BillingPage() {
 
   return (
     <DashboardShell
-      user={{ email: user.email, name: user.name }}
+      user={{ email: user.email, name: user.name, isAdmin: access.isAdmin }}
       title="Billing"
       description="Plan status, billing period, payment history, and support options based on verified account records."
-      badge={<StatusPill tone={access.verifiedPaidAccess ? "green" : "amber"}>{access.verifiedPaidAccess ? "Verified" : "No active access"}</StatusPill>}
+      badge={<StatusPill tone={access.qaAccess ? "cyan" : access.verifiedPaidAccess ? "green" : "amber"}>{access.qaAccess ? "Admin QA access active" : access.verifiedPaidAccess ? "Verified" : "No active access"}</StatusPill>}
     >
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4" id="usage">
         <MetricCard label="Current plan" value={access.rawPlanName || access.planName} detail="Shown from subscription records" tone="violet" />
-        <MetricCard label="Payment status" value={access.status} detail={access.verifiedPaidAccess ? "Paid access allowed" : "Full access locked"} tone={access.verifiedPaidAccess ? "green" : "amber"} />
+        <MetricCard label="Payment status" value={access.status} detail={access.qaAccess ? "Admin QA access active" : access.verifiedPaidAccess ? "Paid access allowed" : "Full access locked"} tone={access.qaAccess ? "cyan" : access.verifiedPaidAccess ? "green" : "amber"} />
         <MetricCard label="Billing period" value={formatDate(access.currentPeriodEnd)} detail={`Starts ${formatDate(access.currentPeriodStart)}`} tone="cyan" />
         <MetricCard label="Renewal date" value={formatDate(access.renewalDate)} detail="For billing changes, contact support" tone="slate" />
       </section>

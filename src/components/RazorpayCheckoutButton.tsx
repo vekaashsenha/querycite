@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 
@@ -12,6 +12,7 @@ type CheckoutResponse = {
   order_id?: string;
   amount?: number;
   currency?: "INR";
+  notes?: Record<string, string>;
   prefill?: {
     name?: string;
     email?: string;
@@ -22,6 +23,10 @@ type CheckoutResponse = {
 type RazorpayCheckoutButtonProps = {
   plan: RazorpayPlan;
   mode?: RazorpayMode;
+  couponCode?: string;
+  buttonLabel?: string;
+  loadingLabel?: string;
+  helperText?: string;
   name?: string;
   email?: string;
   websiteUrl?: string;
@@ -73,10 +78,24 @@ function loadRazorpayScript() {
   return razorpayScriptPromise;
 }
 
-export function RazorpayCheckoutButton({ plan, mode = "order", name, email, websiteUrl, companyName, className = "" }: RazorpayCheckoutButtonProps) {
+export function RazorpayCheckoutButton({
+  plan,
+  mode = "order",
+  couponCode,
+  buttonLabel,
+  loadingLabel = "Opening Razorpay...",
+  helperText,
+  name,
+  email,
+  websiteUrl,
+  companyName,
+  className = "",
+}: RazorpayCheckoutButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const isOrderMode = mode === "order";
+  const defaultButtonLabel = isOrderMode ? "Start Beta" : "Start Test Checkout";
+  const defaultHelperText = isOrderMode ? "You will be charged in INR through Razorpay." : "Payment flow is currently available for private validation.";
 
   async function startCheckout() {
     setIsLoading(true);
@@ -89,6 +108,7 @@ export function RazorpayCheckoutButton({ plan, mode = "order", name, email, webs
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           plan,
+          coupon_code: couponCode,
           name,
           email,
           website_url: websiteUrl,
@@ -99,7 +119,7 @@ export function RazorpayCheckoutButton({ plan, mode = "order", name, email, webs
       const checkoutId = isOrderMode ? data.order_id : data.subscription_id;
 
       if (!response.ok || !checkoutId) {
-        throw new Error(data.error || "Razorpay test payment is temporarily unavailable.");
+        throw new Error(data.error || "Razorpay payment is temporarily unavailable.");
       }
 
       await loadRazorpayScript();
@@ -112,11 +132,11 @@ export function RazorpayCheckoutButton({ plan, mode = "order", name, email, webs
         amount: data.amount,
         currency: data.currency || "INR",
         name: "QueryCite",
-        description: isOrderMode ? `QueryCite ${data.plan_name} one-time test payment` : `QueryCite ${data.plan_name} subscription test checkout`,
+        description: isOrderMode ? `QueryCite ${data.plan_name} paid beta access` : `QueryCite ${data.plan_name} subscription test checkout`,
         prefill: data.prefill,
-        notes: {
+        notes: data.notes || {
           product: "querycite",
-          payment_type: isOrderMode ? "one_time_test" : "subscription_test",
+          payment_type: isOrderMode ? "one_time_beta" : "subscription_test",
           plan_name: data.plan_name,
           source: "querycite_pricing",
         },
@@ -140,7 +160,7 @@ export function RazorpayCheckoutButton({ plan, mode = "order", name, email, webs
 
       checkout.open();
     } catch (checkoutError) {
-      setError(checkoutError instanceof Error ? checkoutError.message : "Razorpay test payment is temporarily unavailable.");
+      setError(checkoutError instanceof Error ? checkoutError.message : "Razorpay payment is temporarily unavailable.");
     } finally {
       setIsLoading(false);
     }
@@ -149,10 +169,10 @@ export function RazorpayCheckoutButton({ plan, mode = "order", name, email, webs
   return (
     <div className="grid gap-2">
       <button type="button" onClick={startCheckout} disabled={isLoading} className={`inline-flex min-h-12 items-center justify-center rounded-full bg-slate-950 px-6 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(15,23,42,0.18)] transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400 ${className}`}>
-        {isLoading ? "Opening test payment..." : isOrderMode ? "Start Test Payment" : "Start Test Checkout"}
+        {isLoading ? loadingLabel : buttonLabel || defaultButtonLabel}
       </button>
       <p className="text-xs font-semibold leading-5 text-slate-500">
-        {isOrderMode ? "Subscription billing is being tested separately. This test payment validates checkout and receipt flow." : "Payment flow is currently available for private validation."}
+        {helperText || defaultHelperText}
       </p>
       {error ? <p className="rounded-2xl border border-amber-100 bg-amber-50 p-3 text-xs font-semibold leading-5 text-amber-900">{error}</p> : null}
     </div>

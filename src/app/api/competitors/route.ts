@@ -46,9 +46,10 @@ async function authenticatedAccess() {
   if (!user) return { error: NextResponse.json({ error: "Please log in to continue." }, { status: 401 }) };
   await syncAuthenticatedUser(user);
   const access = await getPaidAccessContextForUser(user);
-  if (!access.verifiedPaidAccess || !access.subscriptionId) return { error: NextResponse.json({ error: "Verified paid access is required to manage competitors." }, { status: 403 }) };
+  if (!access.verifiedPaidAccess && !access.qaAccess) return { error: NextResponse.json({ error: "Verified paid access is required to manage competitors." }, { status: 403 }) };
+  const subscriptionId = access.subscriptionId || `admin-qa-${user.id}`;
   if (!isSupabaseAdminConfigured()) return { error: NextResponse.json({ error: "Competitor storage is temporarily unavailable." }, { status: 503 }) };
-  return { user, access };
+  return { user, access, subscriptionId };
 }
 
 async function getCompanyProfile(userId: string, subscriptionId: string) {
@@ -153,7 +154,7 @@ export async function GET() {
   const auth = await authenticatedAccess();
   if (auth.error) return auth.error;
   const { user, access } = auth;
-  const subscriptionId = access.subscriptionId as string;
+  const subscriptionId = auth.subscriptionId;
   const companyProfile = await ensureCompanyProfile(user.id, subscriptionId, access.email ?? user.email, access.websiteUrl);
   const limit = await getOrCreateLimit(user.id, subscriptionId, access, companyProfile.id as string);
   const competitors = await getCompetitors(user.id, subscriptionId);
@@ -173,7 +174,7 @@ export async function POST(request: Request) {
     const auth = await authenticatedAccess();
     if (auth.error) return auth.error;
     const { user, access } = auth;
-    const subscriptionId = access.subscriptionId as string;
+    const subscriptionId = auth.subscriptionId;
     const body = (await request.json()) as CompetitorsRequest;
     const incoming = (body.competitors || []).map(normalizeCompetitor).filter(Boolean) as Array<ReturnType<typeof normalizeCompetitor> & Record<string, unknown>>;
 

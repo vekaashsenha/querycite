@@ -2,7 +2,7 @@ import { normalizeWebsiteUrl } from "@/lib/url";
 import { normalizePaidPlanName, planLimits, type PaidPlanName, type PlanLimits } from "@/lib/plans";
 import { isSupabaseAdminConfigured, selectSupabaseRows } from "@/lib/supabase/admin";
 import type { AuditFinding, WebsiteAuditReport } from "@/lib/audit-report";
-import type { QueryCiteUser } from "@/lib/auth/server";
+import { isAdminUser, type QueryCiteUser } from "@/lib/auth/server";
 
 type SubscriptionRow = {
   id?: string | null;
@@ -51,6 +51,8 @@ export type PaymentHistoryItem = {
 export type PaidAccessContext = {
   isConfigured: boolean;
   verifiedPaidAccess: boolean;
+  isAdmin: boolean;
+  qaAccess: boolean;
   subscriptionId: string | null;
   subscriptionRowId: string | null;
   userId: string | null;
@@ -80,6 +82,8 @@ function emptyContext(subscriptionId?: string | null, user?: QueryCiteUser | nul
   return {
     isConfigured: isSupabaseAdminConfigured(),
     verifiedPaidAccess: false,
+    isAdmin: false,
+    qaAccess: false,
     subscriptionId: subscriptionId ?? null,
     subscriptionRowId: null,
     userId: user?.id ?? null,
@@ -105,6 +109,8 @@ function contextFromRow(row: SubscriptionRow | undefined, fallbackSubscriptionId
   return {
     isConfigured: true,
     verifiedPaidAccess,
+    isAdmin: false,
+    qaAccess: false,
     subscriptionId,
     subscriptionRowId: row.id ?? null,
     userId: row.user_id ?? user?.id ?? null,
@@ -136,7 +142,13 @@ export async function getPaidAccessContext(subscriptionId?: string | null): Prom
 }
 
 export async function getPaidAccessContextForUser(user: QueryCiteUser | null): Promise<PaidAccessContext> {
-  if (!user || !isSupabaseAdminConfigured()) return emptyContext(null, user);
+  if (!user) return emptyContext(null, user);
+
+  const admin = await isAdminUser(user);
+  if (!isSupabaseAdminConfigured()) {
+    const empty = emptyContext(null, user);
+    return admin ? { ...empty, isAdmin: true, qaAccess: true, planName: "adminQa", rawPlanName: "Admin QA access", status: "admin_qa", limits: planLimits.adminQa } : empty;
+  }
 
   const rows = await selectSupabaseRows<SubscriptionRow>("subscriptions", {
     select: subscriptionSelect,
@@ -145,7 +157,18 @@ export async function getPaidAccessContextForUser(user: QueryCiteUser | null): P
     limit: "1",
   });
 
-  return contextFromRow(rows[0], rows[0]?.razorpay_subscription_id || rows[0]?.provider_subscription_id || null, user);
+  const context = contextFromRow(rows[0], rows[0]?.razorpay_subscription_id || rows[0]?.provider_subscription_id || null, user);
+  if (!admin) return context;
+
+  return {
+    ...context,
+    isAdmin: true,
+    qaAccess: true,
+    planName: context.verifiedPaidAccess ? context.planName : "adminQa",
+    rawPlanName: context.verifiedPaidAccess ? context.rawPlanName : "Admin QA access",
+    status: context.verifiedPaidAccess ? context.status : "admin_qa",
+    limits: context.verifiedPaidAccess ? context.limits : planLimits.adminQa,
+  };
 }
 
 function numberOrZero(value: unknown) {

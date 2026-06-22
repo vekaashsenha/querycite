@@ -32,7 +32,7 @@ create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   email text not null unique,
   full_name text,
-  role text not null default 'owner',
+  role text not null default 'user',
   company_profile_id uuid references public.company_profiles(id) on delete set null,
   onboarding_status text not null default 'not_started',
   created_at timestamptz not null default now(),
@@ -247,8 +247,26 @@ create table if not exists public.payments (
 -- Auth account mapping additions.
 alter table public.profiles add column if not exists user_id uuid references auth.users(id) on delete cascade;
 alter table public.profiles add column if not exists name text;
+alter table public.profiles add column if not exists role text not null default 'user';
+alter table public.profiles alter column role set default 'user';
+alter table public.profiles drop constraint if exists profiles_role_check;
+update public.profiles set role = 'user' where role is null or role not in ('user', 'admin');
+alter table public.profiles alter column role set not null;
 update public.profiles set user_id = id where user_id is null;
 update public.profiles set name = full_name where name is null and full_name is not null;
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'profiles_role_check'
+      and conrelid = 'public.profiles'::regclass
+  ) then
+    alter table public.profiles
+      add constraint profiles_role_check check (role in ('user', 'admin'));
+  end if;
+end;
+$$;
 alter table public.leads add column if not exists user_id uuid references auth.users(id) on delete set null;
 alter table public.company_profiles alter column owner_user_id drop not null;
 alter table public.company_profiles add column if not exists email text;
@@ -320,6 +338,7 @@ create table if not exists public.email_events (
 
 create unique index if not exists profiles_user_id_unique on public.profiles(user_id) where user_id is not null;
 create index if not exists profiles_email_idx on public.profiles(email);
+create index if not exists profiles_role_idx on public.profiles(role);
 create index if not exists leads_user_id_idx on public.leads(user_id);
 create index if not exists company_profiles_owner_user_id_idx on public.company_profiles(owner_user_id);
 create index if not exists company_profiles_subscription_id_idx on public.company_profiles(subscription_id);

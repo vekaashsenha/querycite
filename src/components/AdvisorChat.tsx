@@ -104,6 +104,7 @@ export function AdvisorChat({ currentReportData, companyProfile, competitorData,
   const [error, setError] = useState("");
   const limits = planLimits[planType] || planLimits.free;
   const isFree = planType === "free";
+  const isAdminQa = planType === "adminQa";
   const hasData = hasReportData(currentReportData);
   const remainingCharacters = maxMessageLength - input.length;
 
@@ -209,8 +210,10 @@ export function AdvisorChat({ currentReportData, companyProfile, competitorData,
           <h3 className="text-2xl font-semibold text-slate-950">AI Visibility Advisor</h3>
           <p className="mt-2 text-sm leading-6 text-slate-600">Report-specific Advisor for AEO/GEO fixes, crawler readiness, competitor gaps, content improvements, developer notes, and next steps.</p>
         </div>
-        <StatusPill tone="violet">{planType === "betaFullReport" ? "Beta preview" : "Paid access"}</StatusPill>
+        <StatusPill tone={isAdminQa ? "cyan" : "violet"}>{isAdminQa ? "Admin QA mode" : planType === "betaFullReport" ? "Beta preview" : "Paid access"}</StatusPill>
       </div>
+
+      {isAdminQa ? <p className="mt-5 rounded-2xl border border-cyan-200 bg-cyan-50 p-4 text-sm font-semibold leading-6 text-cyan-900">Admin QA mode: usage limits relaxed for testing.</p> : null}
 
       <div className="mt-5 grid gap-3 md:grid-cols-4">
         <UsageMeter label="Advisor credits" used={usage.creditsUsed} total={limits.advisorCredits} />

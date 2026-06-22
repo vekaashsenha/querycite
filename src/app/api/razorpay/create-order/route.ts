@@ -1,11 +1,14 @@
-import { NextResponse } from "next/server";
-import { createRazorpayOrder, isRazorpayPlanName } from "@/lib/razorpay";
+﻿import { NextResponse } from "next/server";
+import { getCurrentUser, syncAuthenticatedUser } from "@/lib/auth/server";
+import { IIMA_BETA_ACCESS_DAYS, IIMA_BETA_COUPON_ERROR, validateIimaCouponForCheckout } from "@/lib/coupons";
+import { createRazorpayOrder, getOneTimeOrderAmount, isRazorpayPlanName } from "@/lib/razorpay";
 import { normalizeWebsiteUrl } from "@/lib/url";
 
 export const runtime = "nodejs";
 
 type CreateOrderRequest = {
   plan?: unknown;
+  coupon_code?: unknown;
   name?: string;
   email?: string;
   website_url?: string;
@@ -22,8 +25,11 @@ export async function POST(request: Request) {
     const plan = body.plan;
 
     if (!isRazorpayPlanName(plan)) {
-      return NextResponse.json({ error: "Please select a valid QueryCite test plan." }, { status: 400 });
+      return NextResponse.json({ error: "Please select a valid QueryCite beta plan." }, { status: 400 });
     }
+
+    const user = await getCurrentUser();
+    if (user) await syncAuthenticatedUser(user);
 
     const websiteUrlInput = compactText(body.website_url);
     const websiteUrl = websiteUrlInput ? normalizeWebsiteUrl(websiteUrlInput) : undefined;
@@ -32,18 +38,47 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Please enter a valid website, for example byldgroup.com" }, { status: 400 });
     }
 
+    const suppliedEmail = compactText(body.email).toLowerCase();
+    const checkoutEmail = user?.email || suppliedEmail || undefined;
+    const couponCodeInput = compactText(body.coupon_code);
+    let amount = getOneTimeOrderAmount(plan);
+    let couponCode: string | undefined;
+
+    if (couponCodeInput) {
+      const coupon = await validateIimaCouponForCheckout({
+        code: couponCodeInput,
+        selectedPlan: plan,
+        userId: user?.id ?? null,
+        email: checkoutEmail ?? null,
+      });
+
+      if (!coupon.valid) {
+        return NextResponse.json({ error: IIMA_BETA_COUPON_ERROR }, { status: 400 });
+      }
+
+      amount = coupon.finalAmountPaise;
+      couponCode = coupon.code;
+    }
+
     const checkoutData = await createRazorpayOrder({
       plan,
-      name: compactText(body.name) || undefined,
-      email: compactText(body.email).toLowerCase() || undefined,
+      amount,
+      couponCode,
+      couponFinalAmount: couponCode ? amount : undefined,
+      couponType: couponCode ? "iima_beta" : undefined,
+      paymentType: "one_time_beta",
+      accessDurationDays: IIMA_BETA_ACCESS_DAYS,
+      userId: user?.id,
+      name: compactText(body.name) || user?.name || undefined,
+      email: checkoutEmail,
       websiteUrl: websiteUrl || undefined,
       companyName: compactText(body.company_name) || undefined,
     });
 
     return NextResponse.json(checkoutData);
   } catch (error) {
-    console.error("Razorpay test order creation failed", error);
-    const message = error instanceof Error ? error.message : "Razorpay test payment is temporarily unavailable.";
+    console.error("Razorpay beta order creation failed", error);
+    const message = error instanceof Error ? error.message : "Razorpay payment is temporarily unavailable.";
     const safeMessage = /RAZORPAY_|NEXT_PUBLIC_RAZORPAY/.test(message)
       ? "Razorpay test payment is not configured yet. Add the required Test Mode environment variables."
       : message;

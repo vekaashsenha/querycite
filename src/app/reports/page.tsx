@@ -2,7 +2,7 @@ import Link from "next/link";
 import { DashboardShell, WorkspaceHeader } from "@/components/DashboardShell";
 import { AppCard, EmptyState, PrimaryLink, StatusPill } from "@/components/ui";
 import { getReportsForAuthenticatedUser } from "@/lib/paid-foundation";
-import { requireAuthenticatedUser, syncAuthenticatedUser } from "@/lib/auth/server";
+import { isAdminUser, requireAuthenticatedUser, syncAuthenticatedUser } from "@/lib/auth/server";
 
 function formatDate(value: string | null | undefined) {
   if (!value) return "-";
@@ -13,10 +13,11 @@ export default async function ReportsPage() {
   const user = await requireAuthenticatedUser("/reports");
   await syncAuthenticatedUser(user);
   const reports = await getReportsForAuthenticatedUser(user);
+  const isAdmin = await isAdminUser(user);
 
   return (
     <DashboardShell
-      user={{ email: user.email, name: user.name }}
+      user={{ email: user.email, name: user.name, isAdmin }}
       title="Reports"
       description="Saved QueryCite reports linked to this authenticated account."
       badge={<StatusPill tone={reports.length ? "green" : "amber"}>{reports.length ? `${reports.length} saved` : "No reports yet"}</StatusPill>}

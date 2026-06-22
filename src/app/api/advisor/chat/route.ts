@@ -45,7 +45,7 @@ type UsageRow = Record<string, unknown> & {
   competitor_advice_used?: number | null;
 };
 
-const allowedPlanTypes = new Set(["betaFullReport", "launchTrial", "starter", "pro", "agency"]);
+const allowedPlanTypes = new Set(["betaFullReport", "adminQa", "launchTrial", "starter", "pro", "agency"]);
 
 function compactText(value: unknown) {
   if (typeof value !== "string") return "";
@@ -218,6 +218,7 @@ export async function POST(request: Request) {
     let planName = requestedPlan;
     let usageRow: UsageRow | null = null;
     let resetDate: string | null = null;
+    let isAdminQa = false;
 
     if (requestedPlan !== "betaFullReport") {
       const user = await getCurrentUser();
@@ -226,17 +227,23 @@ export async function POST(request: Request) {
       }
       await syncAuthenticatedUser(user);
       const access = await getPaidAccessContextForUser(user);
-      if (!access.verifiedPaidAccess || !access.subscriptionId) {
-        return NextResponse.json({ error: "AI Advisor requires verified paid access." }, { status: 403 });
-      }
-      planName = access.planName;
-      const periodStart = access.currentPeriodStart || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
-      const periodEnd = access.currentPeriodEnd || new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString();
-      resetDate = periodEnd;
-      usageRow = await getUsage(access.subscriptionId, user.id, planName, periodStart, periodEnd, access.email ?? user.email, body.reportId || null);
-      const check = usageAllows(usageRow, planName, actionType);
-      if (!check.allowed) {
-        return NextResponse.json({ error: "You have used all Advisor credits for this billing period.", usage: check.usage, limits: check.limits, resetDate }, { status: 429 });
+      if (access.qaAccess) {
+        isAdminQa = true;
+        planName = "adminQa";
+        resetDate = access.currentPeriodEnd || new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString();
+      } else {
+        if (!access.verifiedPaidAccess || !access.subscriptionId) {
+          return NextResponse.json({ error: "AI Advisor requires verified paid access." }, { status: 403 });
+        }
+        planName = access.planName;
+        const periodStart = access.currentPeriodStart || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+        const periodEnd = access.currentPeriodEnd || new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString();
+        resetDate = periodEnd;
+        usageRow = await getUsage(access.subscriptionId, user.id, planName, periodStart, periodEnd, access.email ?? user.email, body.reportId || null);
+        const check = usageAllows(usageRow, planName, actionType);
+        if (!check.allowed) {
+          return NextResponse.json({ error: "You have used all Advisor credits for this billing period.", usage: check.usage, limits: check.limits, resetDate }, { status: 429 });
+        }
       }
     }
 
@@ -260,7 +267,7 @@ export async function POST(request: Request) {
       throw new Error("Gemini returned an empty advisor response.");
     }
 
-    const updatedUsage = requestedPlan === "betaFullReport" ? null : await incrementUsage(usageRow, actionType);
+    const updatedUsage = requestedPlan === "betaFullReport" || isAdminQa ? null : await incrementUsage(usageRow, actionType);
     const usagePlan = planLimits[planName];
     const usage = updatedUsage ? {
       creditsUsed: updatedUsage.advisor_credits_used ?? updatedUsage.credits_used ?? 0,

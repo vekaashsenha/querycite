@@ -68,7 +68,7 @@ export async function GET(_request: Request, context: { params: Promise<{ report
     if (user) {
       await syncAuthenticatedUser(user);
       const access = await getPaidAccessContextForUser(user);
-      canReturnFull = Boolean(access.verifiedPaidAccess && row.user_id === user.id);
+      canReturnFull = Boolean((access.verifiedPaidAccess || access.qaAccess) && row.user_id === user.id);
     }
 
     return NextResponse.json({

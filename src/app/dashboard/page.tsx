@@ -16,22 +16,23 @@ export default async function DashboardPage() {
   const access = await getPaidAccessContextForUser(user);
   const reports = await getReportsForAuthenticatedUser(user);
   const latestReport = reports[0] ?? null;
-  const advisorReport = access.verifiedPaidAccess ? latestReport?.fullReportData ?? null : null;
+  const hasWorkspaceAccess = access.verifiedPaidAccess || access.qaAccess;
+  const advisorReport = hasWorkspaceAccess ? latestReport?.fullReportData ?? null : null;
   const latestScore = latestReport?.aiVisibilityScore ? `${latestReport.aiVisibilityScore}/100` : "-";
-  const advisorCredits = access.verifiedPaidAccess ? `0/${access.limits.advisorCredits}` : "0/0";
-  const competitorChanges = access.verifiedPaidAccess ? `${access.limits.competitorChanges}/${access.limits.competitorChanges}` : "0/3";
+  const advisorCredits = hasWorkspaceAccess ? `0/${access.limits.advisorCredits}` : "0/0";
+  const competitorChanges = hasWorkspaceAccess ? `${access.limits.competitorChanges}/${access.limits.competitorChanges}` : "0/3";
 
   return (
     <DashboardShell
-      user={{ email: user.email, name: user.name }}
+      user={{ email: user.email, name: user.name, isAdmin: access.isAdmin }}
       title="Overview"
       description="Your QueryCite workspace for saved reports, AI visibility signals, Advisor usage, competitor context, and billing status."
-      badge={<StatusPill tone={access.verifiedPaidAccess ? "green" : "slate"}>{access.verifiedPaidAccess ? "Full access" : "Free account"}</StatusPill>}
+      badge={<StatusPill tone={access.qaAccess ? "cyan" : access.verifiedPaidAccess ? "green" : "slate"}>{access.qaAccess ? "Admin preview" : access.verifiedPaidAccess ? "Full access" : "Free account"}</StatusPill>}
     >
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="Latest score" value={latestScore} detail={latestReport ? latestReport.finalUrl || latestReport.websiteUrl : "No reports yet"} tone="violet" />
         <MetricCard label="Reports generated" value={reports.length} detail="Reports linked to this account" tone="green" />
-        <MetricCard label="Advisor credits used" value={advisorCredits} detail={access.verifiedPaidAccess ? "Local usage resets by billing period" : "Unlock with full report access"} tone="cyan" />
+        <MetricCard label="Advisor credits used" value={advisorCredits} detail={hasWorkspaceAccess ? (access.qaAccess ? "Admin QA access active" : "Local usage resets by billing period") : "Unlock with full report access"} tone="cyan" />
         <MetricCard label="Competitor changes left" value={competitorChanges} detail="Limit applies per billing period" tone="amber" />
       </section>
 
@@ -70,14 +71,14 @@ export default async function DashboardPage() {
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-violet-700">Plan status</p>
               <h2 className="mt-2 text-2xl font-semibold text-slate-950">{access.rawPlanName || access.planName}</h2>
             </div>
-            <StatusPill tone={access.verifiedPaidAccess ? "green" : "amber"}>{access.status}</StatusPill>
+            <StatusPill tone={access.qaAccess ? "cyan" : access.verifiedPaidAccess ? "green" : "amber"}>{access.qaAccess ? "Admin QA access active" : access.status}</StatusPill>
           </div>
           <div className="mt-5 grid gap-3 text-sm font-semibold text-slate-700">
             {[
               ["Signed in", user.email],
-              ["Renewal/reset", access.verifiedPaidAccess ? formatDate(getAdvisorResetDate(access)) : "Not active"],
-              ["Competitors", access.verifiedPaidAccess ? `${access.limits.competitors} domains` : "Locked"],
-              ["Full exports", access.verifiedPaidAccess ? "PDF and CSV" : "Locked"],
+              ["Renewal/reset", hasWorkspaceAccess ? (access.qaAccess ? "QA mode" : formatDate(getAdvisorResetDate(access))) : "Not active"],
+              ["Competitors", hasWorkspaceAccess ? `${access.limits.competitors} domains` : "Locked"],
+              ["Full exports", hasWorkspaceAccess ? "PDF and CSV" : "Locked"],
             ].map(([label, value]) => (
               <div key={label} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4">
                 <span className="text-slate-500">{label}</span>
@@ -119,7 +120,7 @@ export default async function DashboardPage() {
 
         <AppCard className="p-6">
           <WorkspaceHeader eyebrow="Competitor comparison" title="Competitor workspace" description="Competitor setup is kept gated until verified full access. Free users can preview the value without changing paid access." />
-          {access.verifiedPaidAccess ? (
+          {hasWorkspaceAccess ? (
             <div className="mt-6 grid gap-3">
               {[
                 ["Competitor slots", `${access.limits.competitors}`],

@@ -58,7 +58,7 @@ export async function GET() {
   await syncAuthenticatedUser(user);
   const access = await getPaidAccessContextForUser(user);
 
-  if (!access.verifiedPaidAccess) {
+  if (!access.verifiedPaidAccess && !access.qaAccess) {
     return NextResponse.json({ error: "Verified paid access is required to load profile settings." }, { status: 403 });
   }
 
@@ -77,7 +77,7 @@ export async function POST(request: Request) {
     await syncAuthenticatedUser(user);
     const access = await getPaidAccessContextForUser(user);
 
-    if (!access.verifiedPaidAccess) {
+    if (!access.verifiedPaidAccess && !access.qaAccess) {
       return NextResponse.json({ error: "Verified paid access is required to save profile settings." }, { status: 403 });
     }
 

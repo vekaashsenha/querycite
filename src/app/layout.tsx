@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
-import { getCurrentUser } from "@/lib/auth/server";
+import { getCurrentUser, isAdminUser } from "@/lib/auth/server";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -11,11 +11,12 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const user = await getCurrentUser();
+  const isAdmin = await isAdminUser(user);
 
   return (
     <html lang="en">
       <body>
-        <Header user={user ? { email: user.email, name: user.name } : null} />
+        <Header user={user ? { email: user.email, name: user.name, isAdmin } : null} />
         {children}
         <Footer />
       </body>
