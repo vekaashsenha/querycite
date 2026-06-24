@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { AdvisorChat } from "@/components/AdvisorChat";
 import { ClayCard, LockedPanel, ScoreRing, SectionHeader, StatusPill } from "@/components/ui";
+import { PriorityMatrix, ReadinessSnapshot } from "@/components/ReportVisuals";
 import { auditStorageKey, isWebsiteAuditReport, type AuditFinding, type ScoreName, type WebsiteAuditReport } from "@/lib/audit-report";
 import type { PaidPlanName } from "@/lib/plans";
 
@@ -266,26 +267,13 @@ function BetaBanner() {
   );
 }
 
-function AdminPreviewBanner() {
-  return (
-    <div className="mb-8 rounded-3xl border border-cyan-200 bg-cyan-50 p-5 shadow-sm">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-800">Admin preview</p>
-          <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-800">Admin preview: full features visible for QA.</p>
-        </div>
-        <StatusPill tone="cyan">QA mode</StatusPill>
-      </div>
-    </div>
-  );
-}
 
 function FindingCard({ finding, index }: { finding: AuditFinding; index: number }) {
   return (
     <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-semibold text-slate-950">{index + 1}.</span>
-        <StatusPill tone={finding.priority === "High" ? "amber" : "slate"}>{finding.priority}</StatusPill>
+        <StatusPill tone={finding.priority === "High" ? "rose" : finding.priority === "Medium" ? "amber" : "green"}>{finding.priority}</StatusPill>
         <StatusPill tone="slate">{finding.owner}</StatusPill>
       </div>
       <h3 className="mt-3 text-base font-semibold leading-6 text-slate-950">{finding.issue}</h3>
@@ -737,12 +725,11 @@ export function ReportExperience({ isFullDemo, reportId, subscriptionId, hasVeri
     <main className="px-5 py-14 sm:px-8">
       <section className="mx-auto max-w-7xl">
         {isFullDemo ? <BetaBanner /> : null}
-        {isAdminPreview ? <AdminPreviewBanner /> : null}
 
         <div className="mb-8 overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.10)]">
           <div className="grid gap-0 lg:grid-cols-[0.9fr_1.1fr]">
             <div className="bg-slate-950 p-6 text-white sm:p-8">
-              <StatusPill tone={hasFullAccess ? "violet" : "green"}>{isAdminPreview ? "Admin preview" : isFullDemo ? "Beta full report preview" : hasFullAccess ? "Full report" : "Free report"}</StatusPill>
+              <StatusPill tone={hasFullAccess ? "violet" : "green"}>{isAdminPreview ? "QA" : isFullDemo ? "Beta full report" : hasFullAccess ? "Full report" : "Free report"}</StatusPill>
               <h1 className="mt-5 text-4xl font-semibold leading-tight sm:text-5xl">AI Visibility Audit Report</h1>
               <p className="mt-4 break-all text-sm font-semibold leading-6 text-slate-300">Website URL: {report.finalUrl}</p>
               <p className="mt-1 text-sm text-slate-400">Scanned: {new Date(report.scannedAt).toLocaleString()}</p>
@@ -750,7 +737,7 @@ export function ReportExperience({ isFullDemo, reportId, subscriptionId, hasVeri
                 <span className="text-7xl font-semibold leading-none">{report.scores.aiVisibility}</span>
                 <span className="pb-2 text-sm font-semibold text-slate-400">/ 100 overall</span>
               </div>
-              <p className="mt-5 max-w-md text-sm leading-6 text-slate-300">Premium client-ready audit report covering crawler access, llms.txt, schema, metadata, content clarity, priority fixes, and full-report gates.</p>
+              <p className="mt-5 max-w-md text-sm leading-6 text-slate-300">Crawler, schema, content, and priority signals in one action-ready view.</p>
             </div>
             <div className="grid gap-3 p-5 sm:grid-cols-2 sm:p-6 xl:grid-cols-3">
               {reportSignals.map(([label, value, detail]) => (
@@ -767,6 +754,9 @@ export function ReportExperience({ isFullDemo, reportId, subscriptionId, hasVeri
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {scoreCards(report).slice(1).map(([label, , value, tone]) => <ScoreRing key={label} label={label} score={value} tone={tone} />)}
         </div>
+      </section>
+      <section className="mx-auto max-w-7xl">
+        <ReadinessSnapshot report={report} schemaReadiness={schemaReadiness} />
       </section>
 
       <section className="mx-auto mt-10 grid max-w-7xl gap-6 lg:grid-cols-[1fr_0.9fr]">
@@ -789,17 +779,21 @@ export function ReportExperience({ isFullDemo, reportId, subscriptionId, hasVeri
         </ClayCard>
       </section>
 
+      <section className="mx-auto mt-6 max-w-7xl">
+        <PriorityMatrix findings={report.findings} />
+      </section>
+
       <section className="mx-auto mt-12 max-w-7xl">
         <SectionHeader
           eyebrow="FULL REPORT PREVIEW"
-          title="Unlock the complete AI Visibility Report"
-          description="See the full set of findings, crawler details, llms.txt generator, schema and metadata fixes, developer notes, competitor gaps, AI Advisor, report history, CSV/PDF exports, and share-ready report options."
+          title={hasFullAccess ? "Complete AI Visibility Report" : "Unlock the complete AI Visibility Report"}
+          description="Full findings, crawler and schema details, fix packs, developer notes, competitor gaps, AI Advisor, and exports."
         />
 
         {hasFullAccess ? (
           <div className="mt-8 grid gap-6">
             <div className="rounded-3xl border border-teal-100 bg-teal-50 p-5 text-sm font-semibold leading-6 text-teal-900">
-              This preview is designed to collect feedback on report usefulness, actionability, pricing, and workflow before paid launch.
+              QueryCite is in beta. We are collecting feedback on report clarity, UI/UX, and paid beta access flow.
             </div>
             <ScoreExplanationGrid report={report} />
             <div className="grid gap-6 xl:grid-cols-[1fr_0.9fr]">
@@ -837,7 +831,7 @@ export function ReportExperience({ isFullDemo, reportId, subscriptionId, hasVeri
         ) : (
           <>
             <div className="mt-8 rounded-3xl border border-violet-100 bg-violet-50 p-5 text-sm font-semibold leading-6 text-violet-900">
-              Free checkers show your score. QueryCite turns the score into fixes with crawler details, llms.txt guidance, schema and metadata updates, developer notes, competitor gaps, Advisor support, exports, and report history.
+              Your free score and top fixes are ready. Full access adds deeper diagnostics, Advisor guidance, competitor gaps, and exports.
             </div>
             <div className="mt-8">
               <AdvisorChat currentReportData={report} planType="free" />

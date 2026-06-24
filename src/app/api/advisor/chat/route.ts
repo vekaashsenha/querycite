@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { ApiError, GoogleGenAI, ThinkingLevel } from "@google/genai";
 import { NextResponse } from "next/server";
 import { getPaidAccessContextForUser } from "@/lib/paid-foundation";
 import { getGeminiModel } from "@/lib/gemini";
@@ -11,7 +11,10 @@ export const runtime = "nodejs";
 const ADVISOR_GEMINI_MODEL = getGeminiModel("advisor");
 const MAX_MESSAGE_LENGTH = 900;
 const MAX_HISTORY_ITEMS = 8;
+const MIN_ADVISOR_WORDS = 80;
+const ADVISOR_TIMEOUT_MS = 30_000;
 const offTopicReply = "I can only help with this AI Visibility Report, AEO/GEO fixes, competitor gaps, content improvements, developer notes, and next steps.";
+const normalUserErrorCopy = "AI Visibility Advisor is being tuned for beta. Your report and recommended fixes are available now.";
 
 const systemInstruction = `You are QueryCite AI Visibility Advisor. You help users understand and act on their current AI Visibility Audit report. Only answer using the current report data, saved company profile context, saved competitor data, and related AEO/GEO best practices. Do not answer unrelated questions. Do not guarantee AI citations, rankings, traffic, revenue, or search positions. Give practical next steps for marketing, content, and developer teams. Refuse black-hat SEO, spam tactics, scraping bypasses, competitor defamation, and medical, legal, or financial advice.`;
 
@@ -35,6 +38,29 @@ type AdvisorChatRequest = {
   subscriptionId?: string | null;
   reportId?: string | null;
   chatHistory?: RawChatMessage[];
+};
+
+type AdvisorErrorCode =
+  | "missing_key"
+  | "timeout"
+  | "quota"
+  | "invalid_key"
+  | "model_error"
+  | "empty_response"
+  | "provider_error"
+  | "backend_error";
+
+type AdvisorAccessState = "admin" | "paid" | "free";
+
+type AdvisorDiagnostics = {
+  status: "ready" | "error";
+  geminiKey: "configured" | "missing";
+  reportContext: "found" | "missing";
+  accessState: AdvisorAccessState;
+  lastError: AdvisorErrorCode | null;
+  responseLength: number;
+  modelUsed: string;
+  retried: boolean;
 };
 
 type UsageRow = Record<string, unknown> & {
@@ -97,28 +123,197 @@ function isBlockedOrUnrelated(message: string) {
 
 function actionInstruction(actionType: AdvisorActionType) {
   if (actionType === "blog_brief") {
-    return "Return a blog/content brief with title, target query, buyer intent, suggested structure, FAQ section, schema recommendation, internal linking suggestion, and AEO/GEO angle.";
+    return "Return exactly 5 blog ideas. For each include target query, buyer intent, short outline, FAQ/schema angle, and AEO/GEO value.";
   }
   if (actionType === "fix_pack") {
-    return "Return a fix pack with issue, why it matters, exact recommendation, effort level, expected impact, developer note, and priority.";
+    return "Return a fix pack with issue, why it matters, exact recommendation, effort level, expected impact, implementation note, owner, and priority.";
   }
   if (actionType === "competitor_advice") {
-    return "Compare the user site with saved competitors only if competitor data is present. Return competitor gaps, priority recommendations, and do not defame competitors.";
+    return "Compare the user site with saved competitors only if competitor data is present. Return comparison summary, gaps, what competitors do better, and recommended action. Do not defame competitors.";
   }
-  return "Answer the report-specific question with concise practical next steps.";
+  return "Answer the report-specific question with practical next steps.";
+}
+
+function quickActionInstruction(message: string) {
+  const normalized = message.toLowerCase();
+
+  if (normalized.includes("explain my ai visibility score") || normalized.includes("explain my score")) {
+    return "Use these sections: Score meaning; Main reasons; What is good; What needs improvement; Next 3 actions.";
+  }
+  if (normalized.includes("what should i fix first")) {
+    return "Return the Top 3 fixes. For each fix include Effort, Impact, Priority, and the first implementation step.";
+  }
+  if (normalized.includes("aeo/geo fix plan")) {
+    return "Return a 7-day plan and a 30-day plan. Assign each action to marketer, developer, or content owner.";
+  }
+  if (normalized.includes("developer action notes")) {
+    return "For each developer action include issue, technical fix, implementation note, and priority.";
+  }
+  if (normalized.includes("30-day") && normalized.includes("visibility")) {
+    return "Return a week-by-week 30-day plan. Include expected outcome and priority for each week.";
+  }
+
+  return "";
 }
 
 function buildAdvisorPrompt(message: string, currentReportData: unknown, chatHistory: ChatMessage[], companyProfile: unknown, competitorData: unknown, actionType: AdvisorActionType) {
-  return `Current report data, which you must use as the source of truth:\n${JSON.stringify(currentReportData, null, 2)}\n\nCompany profile context:\n${JSON.stringify(companyProfile || {}, null, 2)}\n\nCompetitor comparison data:\n${JSON.stringify(competitorData || {}, null, 2)}\n\nRecent chat history:\n${JSON.stringify(chatHistory, null, 2)}\n\nUser question:\n${message}\n\nAction mode:\n${actionInstruction(actionType)}\n\nResponse rules:\n- Answer only about this report, saved reports, company profile, AEO/GEO readiness, citation readiness, competitor gaps, content fixes, developer notes, schema/metadata/internal linking, exports, or 7-day/30-day next steps.\n- If the question is unrelated, answer exactly: ${offTopicReply}\n- Do not guarantee AI citations, rankings, traffic, revenue, or search positions.\n- Use phrases like improve AI visibility readiness, citation-readiness, crawlability, structured clarity, and increase likelihood of being understood by AI/search systems.\n- Keep the response concise, practical, and specific to the report context.\n- Prefer bullets or short sections for clarity.\n- Target 140-220 words.`;
+  return `Current report data, which you must use as the source of truth:
+${JSON.stringify(currentReportData, null, 2)}
+
+Company profile context:
+${JSON.stringify(companyProfile || {}, null, 2)}
+
+Competitor comparison data:
+${JSON.stringify(competitorData || {}, null, 2)}
+
+Recent chat history:
+${JSON.stringify(chatHistory, null, 2)}
+
+User question:
+${message}
+
+Action mode:
+${actionInstruction(actionType)}
+${quickActionInstruction(message)}
+
+Response rules:
+- Answer only about this report, saved reports, company profile, AEO/GEO readiness, citation readiness, competitor gaps, content fixes, developer notes, schema/metadata/internal linking, exports, or 7-day/30-day next steps.
+- If the question is unrelated, answer exactly: ${offTopicReply}
+- Do not guarantee AI citations, rankings, traffic, revenue, or search positions.
+- Use phrases like improve AI visibility readiness, citation-readiness, crawlability, structured clarity, and increase likelihood of being understood by AI/search systems.
+- Every normal response must include: Short diagnosis; Why it matters for AI visibility; Recommended fix; Priority: High, Medium, or Low; Next action.
+- Never return a one-line fragment or fewer than ${MIN_ADVISOR_WORDS} words for a normal answer.
+- Prefer clear headings and bullets. Preserve useful detail without adding generic filler.
+- Target 140-240 words.`;
 }
 
 function sanitizeForbiddenClaims(reply: string) {
   return reply
-    .replace(/guaranteed\\s+AI\\s+ranking/gi, "improved AI visibility readiness")
-    .replace(/guaranteed\\s+ChatGPT\\s+citation/gi, "improved citation-readiness")
-    .replace(/guaranteed\\s+traffic/gi, "stronger readiness signals")
-    .replace(/guaranteed\\s+revenue/gi, "clearer next-step signals")
-    .replace(/guaranteed\\s+search\\s+position/gi, "stronger search readiness");
+    .replace(/guaranteed\s+AI\s+ranking/gi, "improved AI visibility readiness")
+    .replace(/guaranteed\s+ChatGPT\s+citation/gi, "improved citation-readiness")
+    .replace(/guaranteed\s+traffic/gi, "stronger readiness signals")
+    .replace(/guaranteed\s+revenue/gi, "clearer next-step signals")
+    .replace(/guaranteed\s+search\s+position/gi, "stronger search readiness");
+}
+
+function wordCount(value: string) {
+  return value.trim().split(/\s+/).filter(Boolean).length;
+}
+
+function reportFallbackDetail(currentReportData: unknown) {
+  if (!currentReportData || typeof currentReportData !== "object") {
+    return {
+      score: "the current audit score",
+      issue: "the highest-priority finding in the report",
+      fix: "review the report findings and implement the highest-priority recommendation first",
+    };
+  }
+
+  const report = currentReportData as {
+    scores?: { aiVisibility?: unknown };
+    findings?: Array<{ issue?: unknown; recommendedFix?: unknown }>;
+  };
+  const firstFinding = Array.isArray(report.findings) ? report.findings[0] : undefined;
+  const numericScore = typeof report.scores?.aiVisibility === "number" ? `${report.scores.aiVisibility}/100` : "the current audit score";
+
+  return {
+    score: numericScore,
+    issue: truncateText(firstFinding?.issue, 220) || "the highest-priority finding in the report",
+    fix: truncateText(firstFinding?.recommendedFix, 320) || "implement the highest-priority recommendation shown in the report",
+  };
+}
+
+function structuredFallback(currentReportData: unknown) {
+  const detail = reportFallbackDetail(currentReportData);
+  return `## Short diagnosis
+Your AI Visibility Score is ${detail.score}. The clearest issue to address first is ${detail.issue}. This suggests the site has useful signals, but some are not explicit or structured enough for AI and search systems to interpret consistently.
+
+## Why it matters for AI visibility
+Clear crawler access, entity signals, answer-ready content, and valid structured data improve citation-readiness and increase the likelihood of the site being understood accurately.
+
+## Recommended fix
+Start with this report-backed action: ${detail.fix}. Validate the change against visible page content and avoid adding claims or schema that the page does not support.
+
+## Priority
+High
+
+## Next action
+Assign the fix to the relevant owner, publish it, then rerun the audit to confirm whether the readiness signals and related score improve.`;
+}
+
+function diagnosticState(input: Partial<AdvisorDiagnostics> & Pick<AdvisorDiagnostics, "accessState">): AdvisorDiagnostics {
+  return {
+    status: input.status ?? "ready",
+    geminiKey: process.env.GEMINI_API_KEY ? "configured" : "missing",
+    reportContext: input.reportContext ?? "found",
+    accessState: input.accessState,
+    lastError: input.lastError ?? null,
+    responseLength: input.responseLength ?? 0,
+    modelUsed: ADVISOR_GEMINI_MODEL,
+    retried: input.retried ?? false,
+  };
+}
+
+function structuredError(code: AdvisorErrorCode, status: number, diagnosticMessage: string, retryable: boolean, diagnostics?: AdvisorDiagnostics) {
+  return NextResponse.json(
+    {
+      error: {
+        code,
+        message: normalUserErrorCopy,
+        retryable,
+      },
+      ...(diagnostics ? { diagnostics: { ...diagnostics, status: "error", lastError: code }, diagnosticMessage } : {}),
+    },
+    { status },
+  );
+}
+
+function classifyProviderError(error: unknown) {
+  let status = 0;
+  if (error instanceof ApiError) {
+    status = error.status;
+  } else if (typeof error === "object" && error !== null && "status" in error) {
+    const possibleStatus = (error as { status?: unknown }).status;
+    status = typeof possibleStatus === "number" ? possibleStatus : 0;
+  }
+
+  const message = error instanceof Error ? error.message : String(error);
+  const normalized = message.toLowerCase();
+
+  if (normalized.includes("timeout") || normalized.includes("timed out") || normalized.includes("abort")) {
+    return { code: "timeout" as const, status: 504, message: "Gemini request timed out.", retryable: true };
+  }
+  if (status === 429 || normalized.includes("quota") || normalized.includes("resource_exhausted")) {
+    return { code: "quota" as const, status: 503, message: "Gemini quota or rate limit was reached.", retryable: true };
+  }
+  if (status === 401 || status === 403 || normalized.includes("api key") || normalized.includes("permission_denied")) {
+    return { code: "invalid_key" as const, status: 503, message: "Gemini rejected the configured API key.", retryable: false };
+  }
+  if (status === 404 || (normalized.includes("model") && normalized.includes("not found"))) {
+    return { code: "model_error" as const, status: 503, message: `Gemini model ${ADVISOR_GEMINI_MODEL} is unavailable.`, retryable: false };
+  }
+  if (status >= 500 || error instanceof ApiError) {
+    return { code: "provider_error" as const, status: 503, message: `Gemini API error${status ? ` (${status})` : ""}.`, retryable: true };
+  }
+  return { code: "backend_error" as const, status: 500, message: "Unexpected Advisor backend error.", retryable: true };
+}
+
+async function generateAdvisorReply(ai: GoogleGenAI, prompt: string, actionType: AdvisorActionType, retry = false) {
+  const response = await ai.models.generateContent({
+    model: ADVISOR_GEMINI_MODEL,
+    contents: retry
+      ? `${prompt}\n\nThe previous draft was empty, incomplete, or under ${MIN_ADVISOR_WORDS} words. Regenerate the complete answer now. Use the required headings, finish every sentence, and return 140-240 words.`
+      : prompt,
+    config: {
+      temperature: 0.25,
+      maxOutputTokens: actionType === "chat" ? 1_400 : 1_900,
+      systemInstruction,
+      thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+      httpOptions: { timeout: ADVISOR_TIMEOUT_MS },
+    },
+  });
+
+  return response.text?.trim() ?? "";
 }
 
 function usageAllows(row: UsageRow | null, planName: PaidPlanName, actionType: AdvisorActionType) {
@@ -188,7 +383,29 @@ async function incrementUsage(row: UsageRow | null, actionType: AdvisorActionTyp
   return updated[0] as UsageRow;
 }
 
+export async function GET() {
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: "Not found." }, { status: 404 });
+  }
+
+  await syncAuthenticatedUser(user);
+  const access = await getPaidAccessContextForUser(user);
+  if (!access.qaAccess) {
+    return NextResponse.json({ error: "Not found." }, { status: 404 });
+  }
+
+  return NextResponse.json({
+    diagnostics: diagnosticState({
+      accessState: "admin",
+      reportContext: "missing",
+    }),
+  });
+}
+
 export async function POST(request: Request) {
+  let adminDiagnostics: AdvisorDiagnostics | undefined;
+
   try {
     const body = (await request.json()) as AdvisorChatRequest;
     const message = compactText(body.message);
@@ -231,6 +448,7 @@ export async function POST(request: Request) {
         isAdminQa = true;
         planName = "adminQa";
         resetDate = access.currentPeriodEnd || new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString();
+        adminDiagnostics = diagnosticState({ accessState: "admin", reportContext: "found" });
       } else {
         if (!access.verifiedPaidAccess || !access.subscriptionId) {
           return NextResponse.json({ error: "AI Advisor requires verified paid access." }, { status: 403 });
@@ -248,24 +466,23 @@ export async function POST(request: Request) {
     }
 
     if (!process.env.GEMINI_API_KEY) {
-      return NextResponse.json({ error: "AI Advisor is unavailable because Gemini is not configured, but your audit report is still available." }, { status: 500 });
+      return structuredError(
+        "missing_key",
+        503,
+        "GEMINI_API_KEY is missing from the server environment.",
+        false,
+        adminDiagnostics,
+      );
     }
 
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    const response = await ai.models.generateContent({
-      model: ADVISOR_GEMINI_MODEL,
-      contents: buildAdvisorPrompt(message, body.currentReportData, sanitizeHistory(body.chatHistory), body.companyProfile, body.competitorData, actionType),
-      config: {
-        temperature: 0.25,
-        maxOutputTokens: actionType === "chat" ? 620 : 820,
-        systemInstruction,
-      },
-    });
-
-    const reply = response.text?.trim();
-    if (!reply) {
-      throw new Error("Gemini returned an empty advisor response.");
-    }
+    const prompt = buildAdvisorPrompt(message, body.currentReportData, sanitizeHistory(body.chatHistory), body.companyProfile, body.competitorData, actionType);
+    const firstReply = await generateAdvisorReply(ai, prompt, actionType);
+    const shouldRetry = !firstReply || wordCount(firstReply) < MIN_ADVISOR_WORDS;
+    const retryReply = shouldRetry ? await generateAdvisorReply(ai, prompt, actionType, true) : "";
+    const generatedReply = shouldRetry ? retryReply : firstReply;
+    const usedFallback = !generatedReply || wordCount(generatedReply) < MIN_ADVISOR_WORDS;
+    const reply = sanitizeForbiddenClaims(usedFallback ? structuredFallback(body.currentReportData) : generatedReply);
 
     const updatedUsage = requestedPlan === "betaFullReport" || isAdminQa ? null : await incrementUsage(usageRow, actionType);
     const usagePlan = planLimits[planName];
@@ -275,10 +492,31 @@ export async function POST(request: Request) {
       fixPacksUsed: updatedUsage.fix_packs_used ?? 0,
       competitorAdviceUsed: updatedUsage.competitor_advice_used ?? 0,
     } : null;
+    const diagnostics = isAdminQa
+      ? diagnosticState({
+          accessState: "admin",
+          reportContext: "found",
+          lastError: usedFallback ? "empty_response" : null,
+          responseLength: reply.length,
+          retried: shouldRetry,
+        })
+      : undefined;
 
-    return NextResponse.json({ reply: sanitizeForbiddenClaims(reply), model: ADVISOR_GEMINI_MODEL, usage, limits: usagePlan, resetDate });
+    return NextResponse.json({
+      reply,
+      model: ADVISOR_GEMINI_MODEL,
+      usage,
+      limits: usagePlan,
+      resetDate,
+      ...(diagnostics ? { diagnostics } : {}),
+    });
   } catch (error) {
-    console.error("AI Advisor chat failed", error);
-    return NextResponse.json({ error: "AI Advisor could not respond right now. Please try again." }, { status: 500 });
+    const classified = classifyProviderError(error);
+    console.error("AI Advisor chat failed", {
+      code: classified.code,
+      model: ADVISOR_GEMINI_MODEL,
+      status: classified.status,
+    });
+    return structuredError(classified.code, classified.status, classified.message, classified.retryable, adminDiagnostics);
   }
 }

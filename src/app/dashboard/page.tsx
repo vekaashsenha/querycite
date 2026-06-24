@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { AdvisorChat } from "@/components/AdvisorChat";
 import { DashboardShell, WorkspaceHeader } from "@/components/DashboardShell";
 import { AppCard, EmptyState, LockedPanel, MetricCard, PrimaryLink, StatusPill } from "@/components/ui";
@@ -6,8 +6,22 @@ import { getAdvisorResetDate, getPaidAccessContextForUser, getReportsForAuthenti
 import { requireAuthenticatedUser, syncAuthenticatedUser } from "@/lib/auth/server";
 
 function formatDate(value: string | null | undefined) {
-  if (!value) return "-";
+  if (!value) return "—";
   return new Date(value).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function ScoreBar({ label, score, tone }: { label: string; score: number; tone: string }) {
+  return (
+    <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</p>
+        <p className="text-lg font-semibold text-slate-950">{score}</p>
+      </div>
+      <div className="mt-3 h-2 rounded-full bg-white">
+        <div className={`h-2 rounded-full ${tone}`} style={{ width: `${Math.max(0, Math.min(100, score))}%` }} />
+      </div>
+    </div>
+  );
 }
 
 export default async function DashboardPage() {
@@ -18,25 +32,22 @@ export default async function DashboardPage() {
   const latestReport = reports[0] ?? null;
   const hasWorkspaceAccess = access.verifiedPaidAccess || access.qaAccess;
   const advisorReport = hasWorkspaceAccess ? latestReport?.fullReportData ?? null : null;
-  const latestScore = latestReport?.aiVisibilityScore ? `${latestReport.aiVisibilityScore}/100` : "-";
-  const advisorCredits = hasWorkspaceAccess ? `0/${access.limits.advisorCredits}` : "0/0";
-  const competitorChanges = hasWorkspaceAccess ? `${access.limits.competitorChanges}/${access.limits.competitorChanges}` : "0/3";
-  const badgeText = access.qaAccess ? "Admin preview" : access.isPaidBetaAccess ? "Paid beta access active" : access.isExpiredBetaAccess ? "Paid beta access expired" : access.verifiedPaidAccess ? "Full access" : "Free account";
+  const latestScore = latestReport ? `${latestReport.aiVisibilityScore}/100` : "—";
+  const badgeText = access.qaAccess ? "QA" : access.isPaidBetaAccess ? "Beta active" : access.isExpiredBetaAccess ? "Beta expired" : access.verifiedPaidAccess ? "Full access" : "Free";
   const badgeTone = access.qaAccess ? "cyan" : access.isPaidBetaAccess ? "green" : access.isExpiredBetaAccess ? "amber" : access.verifiedPaidAccess ? "green" : "slate";
-  const statusText = access.qaAccess ? "Admin QA access active" : access.isPaidBetaAccess ? "Paid beta access active" : access.isExpiredBetaAccess ? "Paid beta access expired" : access.status;
 
   return (
     <DashboardShell
       user={{ email: user.email, name: user.name, isAdmin: access.isAdmin }}
       title="Overview"
-      description="Your QueryCite workspace for saved reports, AI visibility signals, Advisor usage, competitor context, and billing status."
+      description="Scores, reports, Advisor access, and account status in one workspace."
       badge={<StatusPill tone={badgeTone}>{badgeText}</StatusPill>}
     >
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Latest score" value={latestScore} detail={latestReport ? latestReport.finalUrl || latestReport.websiteUrl : "No reports yet"} tone="violet" />
-        <MetricCard label="Reports generated" value={reports.length} detail="Reports linked to this account" tone="green" />
-        <MetricCard label="Advisor credits used" value={advisorCredits} detail={hasWorkspaceAccess ? (access.qaAccess ? "Admin QA access active" : access.isPaidBetaAccess ? `Valid until ${formatDate(access.accessEndsAt)}` : "Local usage resets by billing period") : "Unlock with full report access"} tone="cyan" />
-        <MetricCard label="Competitor changes left" value={competitorChanges} detail="Limit applies per billing period" tone="amber" />
+        <MetricCard label="Latest score" value={latestScore} detail={latestReport ? latestReport.finalUrl || latestReport.websiteUrl : "Run your first audit"} tone="violet" />
+        <MetricCard label="Reports generated" value={reports.length} detail="Linked to this account" tone="green" />
+        <MetricCard label="Advisor credits" value={hasWorkspaceAccess ? access.limits.advisorCredits : 0} detail={hasWorkspaceAccess ? "Available per billing period" : "Unlock with full access"} tone="cyan" />
+        <MetricCard label="Competitor changes" value={hasWorkspaceAccess ? `Up to ${access.limits.competitorChanges}` : "Locked"} detail="Per billing period" tone="amber" />
       </section>
 
       {access.isExpiredBetaAccess ? (
@@ -44,66 +55,57 @@ export default async function DashboardPage() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <StatusPill tone="amber">Paid beta access expired</StatusPill>
-              <h2 className="mt-3 text-xl font-semibold text-slate-950">Your 1-month paid beta access has ended.</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-700">Full report sections, full PDF/CSV exports, competitor comparison, and AI Advisor are locked until you renew, upgrade, or contact support.</p>
+              <h2 className="mt-3 text-xl font-semibold text-slate-950">Your 1-month access has ended.</h2>
+              <p className="mt-2 text-sm text-slate-700">Renew to reopen full reports, exports, competitor comparison, and AI Advisor.</p>
             </div>
             <Link href="/pricing" className="inline-flex min-h-11 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-semibold text-white">Renew or upgrade</Link>
           </div>
         </AppCard>
       ) : null}
 
-      <section className="grid gap-6 xl:grid-cols-[1fr_0.74fr]">
+      <section className="grid gap-6 xl:grid-cols-[1.1fr_0.7fr]">
         <AppCard className="p-6">
           <WorkspaceHeader
             eyebrow="Latest report"
-            title={latestReport ? latestReport.finalUrl || latestReport.websiteUrl : "No reports yet. Run your first audit."}
-            description={latestReport ? `Scanned ${formatDate(latestReport.createdAt)}. Review scores, top findings, and free/full report access from here.` : "Run a free audit to generate your first AI visibility report and start building report history."}
+            title={latestReport ? latestReport.finalUrl || latestReport.websiteUrl : "Run your first audit"}
+            description={latestReport ? `Scanned ${formatDate(latestReport.createdAt)}` : "Your newest report will appear here."}
             action={<PrimaryLink href="/#audit">Run New Audit</PrimaryLink>}
           />
           {latestReport ? (
-            <div className="mt-6 grid gap-3 sm:grid-cols-4">
-              {[
-                ["AI Visibility", latestReport.aiVisibilityScore],
-                ["AEO", latestReport.aeoScore],
-                ["GEO", latestReport.geoScore],
-                ["Crawler", latestReport.aiCrawlerReadinessScore],
-              ].map(([label, score]) => (
-                <div key={label} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</p>
-                  <p className="mt-2 text-2xl font-semibold text-slate-950">{score}</p>
-                </div>
-              ))}
+            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              <ScoreBar label="AI Visibility" score={latestReport.aiVisibilityScore} tone="bg-violet-600" />
+              <ScoreBar label="AEO" score={latestReport.aeoScore} tone="bg-fuchsia-500" />
+              <ScoreBar label="GEO" score={latestReport.geoScore} tone="bg-emerald-500" />
+              <ScoreBar label="Crawler readiness" score={latestReport.aiCrawlerReadinessScore} tone="bg-cyan-500" />
             </div>
           ) : (
             <div className="mt-6">
-              <EmptyState title="No reports yet. Run your first audit." description="Your newest AI visibility report will appear here after you complete a free audit and lead capture." action={<PrimaryLink href="/#audit">Run Free Audit</PrimaryLink>} />
+              <EmptyState title="No reports yet" description="Run a free audit to create your first AI visibility report." action={<PrimaryLink href="/#audit">Run Free Audit</PrimaryLink>} />
             </div>
           )}
         </AppCard>
 
         <AppCard className="p-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-violet-700">Plan status</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-violet-700">Access</p>
               <h2 className="mt-2 text-2xl font-semibold text-slate-950">{access.rawPlanName || access.planName}</h2>
             </div>
-            <StatusPill tone={badgeTone}>{statusText}</StatusPill>
+            <StatusPill tone={badgeTone}>{badgeText}</StatusPill>
           </div>
-          <div className="mt-5 grid gap-3 text-sm font-semibold text-slate-700">
+          <div className="mt-5 grid gap-3">
             {[
-              ["Signed in", user.email],
-              ["Access valid until", hasWorkspaceAccess ? (access.qaAccess ? "QA mode" : formatDate(access.accessEndsAt ?? getAdvisorResetDate(access))) : access.isExpiredBetaAccess ? formatDate(access.accessEndsAt) : "Not active"],
-              ["Coupon", access.couponCode || "-"],
+              ["Valid until", hasWorkspaceAccess ? (access.qaAccess ? "QA access" : formatDate(access.accessEndsAt ?? getAdvisorResetDate(access))) : "Not active"],
               ["Competitors", hasWorkspaceAccess ? `${access.limits.competitors} domains` : "Locked"],
-              ["Full exports", hasWorkspaceAccess ? "PDF and CSV" : "Locked"],
+              ["Exports", hasWorkspaceAccess ? "Full PDF + CSV" : "Free PDF"],
+              ["Beta offer", access.couponCode ? "Cohort offer applied" : "—"],
             ].map(([label, value]) => (
-              <div key={label} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4">
+              <div key={label} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm font-semibold">
                 <span className="text-slate-500">{label}</span>
-                <span className="break-all text-right text-slate-950">{value}</span>
+                <span className="text-right text-slate-950">{value}</span>
               </div>
             ))}
           </div>
-          <p className="mt-5 rounded-2xl border border-slate-200 bg-white p-4 text-xs font-semibold leading-5 text-slate-600">For billing changes, contact support. Upgrade and cancellation automation is not presented as self-serve until it is ready.</p>
           <div className="mt-5 flex flex-wrap gap-3">
             <Link href="/profile" className="inline-flex min-h-11 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-semibold text-white">Profile</Link>
             <Link href="/billing" className="inline-flex min-h-11 items-center justify-center rounded-full border border-slate-300 bg-white px-5 text-sm font-semibold text-slate-900">Billing</Link>
@@ -111,45 +113,37 @@ export default async function DashboardPage() {
         </AppCard>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[1fr_0.78fr]">
+      <section className="grid gap-6 xl:grid-cols-[1fr_0.72fr]">
         <AppCard className="p-6">
-          <WorkspaceHeader eyebrow="Previous reports" title="Report history" description="Saved reports linked to your authenticated account. Free report links remain viewable without login through report-specific URLs." action={<Link href="/reports" className="inline-flex min-h-11 items-center justify-center rounded-full border border-slate-300 bg-white px-5 text-sm font-semibold text-slate-900">View all</Link>} />
+          <WorkspaceHeader eyebrow="History" title="Previous reports" description="Open saved reports linked to this account." action={<Link href="/reports" className="inline-flex min-h-11 items-center justify-center rounded-full border border-slate-300 bg-white px-5 text-sm font-semibold text-slate-900">View all</Link>} />
           {reports.length ? (
-            <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200">
-              <div className="hidden bg-slate-950 px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-white md:grid md:grid-cols-[1.4fr_0.7fr_0.5fr_0.5fr_0.5fr_0.8fr]">
-                <span>Website</span><span>Date</span><span>AI</span><span>AEO</span><span>GEO</span><span>Actions</span>
-              </div>
-              {reports.slice(0, 6).map((report) => (
-                <div key={report.id} className="grid gap-3 border-t border-slate-100 bg-white px-4 py-4 text-sm leading-6 text-slate-700 md:grid-cols-[1.4fr_0.7fr_0.5fr_0.5fr_0.5fr_0.8fr]">
+            <div className="mt-6 grid gap-3">
+              {reports.slice(0, 5).map((report) => (
+                <div key={report.id} className="grid gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm md:grid-cols-[1.5fr_0.7fr_0.5fr_auto] md:items-center">
                   <span className="break-all font-semibold text-slate-950">{report.finalUrl || report.websiteUrl}</span>
-                  <span>{formatDate(report.createdAt)}</span>
-                  <span>{report.aiVisibilityScore}</span>
-                  <span>{report.aeoScore}</span>
-                  <span>{report.geoScore}</span>
-                  <Link href={`/report?reportId=${report.id}`} className="font-semibold text-violet-700">View report</Link>
+                  <span className="text-slate-600">{formatDate(report.createdAt)}</span>
+                  <span className="font-semibold text-violet-700">{report.aiVisibilityScore}/100</span>
+                  <Link href={`/report?reportId=${report.id}`} className="font-semibold text-slate-950">View report →</Link>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="mt-6"><EmptyState title="No reports yet. Run your first audit." description="Report history appears after a report is saved against your account." action={<PrimaryLink href="/#audit">Run Free Audit</PrimaryLink>} /></div>
+            <div className="mt-6"><EmptyState title="No saved reports" description="Reports appear after an audit is saved to your account." action={<PrimaryLink href="/#audit">Run Free Audit</PrimaryLink>} /></div>
           )}
         </AppCard>
 
         <AppCard className="p-6">
-          <WorkspaceHeader eyebrow="Competitor comparison" title="Competitor workspace" description="Competitor setup is kept gated until verified full access. Free users can preview the value without changing paid access." />
+          <WorkspaceHeader eyebrow="Competitors" title="Comparison workspace" description="Track competitor readiness and gap priorities." />
           {hasWorkspaceAccess ? (
             <div className="mt-6 grid gap-3">
-              {[
-                ["Competitor slots", `${access.limits.competitors}`],
-                ["Changes left", `${access.limits.competitorChanges}/${access.limits.competitorChanges}`],
-                ["Status", "Ready in Profile"],
-              ].map(([label, value]) => <MetricCard key={label} label={label} value={value} />)}
+              <MetricCard label="Competitor slots" value={access.limits.competitors} />
+              <MetricCard label="Changes per period" value={access.limits.competitorChanges} />
+              <Link href="/profile#competitors" className="inline-flex min-h-11 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-semibold text-white">Manage competitors</Link>
             </div>
           ) : (
             <div className="mt-6 grid gap-4">
               <LockedPanel title="Competitor comparison" description="Available in the full report" />
               <LockedPanel title="AI Visibility Advisor" description="Available in the full report" />
-              <LockedPanel title="Full downloads" description="Available in the full report" />
             </div>
           )}
         </AppCard>
@@ -157,12 +151,18 @@ export default async function DashboardPage() {
 
       <section id="adviser">
         {advisorReport ? (
-          <AdvisorChat currentReportData={advisorReport} planType={access.planName} subscriptionId={access.subscriptionId} reportId={latestReport?.id ?? null} resetDate={getAdvisorResetDate(access)} />
+          <AdvisorChat
+            currentReportData={advisorReport}
+            planType={access.qaAccess ? "adminQa" : access.planName}
+            subscriptionId={access.subscriptionId}
+            reportId={latestReport?.id ?? null}
+            resetDate={getAdvisorResetDate(access)}
+          />
         ) : (
           <AppCard className="p-6">
             <StatusPill tone="amber">AI Visibility Advisor</StatusPill>
-            <h2 className="mt-3 text-2xl font-semibold text-slate-950">Advisor unlocks with verified paid access and a saved report.</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">Free users can view limited reports and download limited PDFs. Full report chat stays locked until account records confirm full access.</p>
+            <h2 className="mt-3 text-2xl font-semibold text-slate-950">Advisor needs full access and a saved report.</h2>
+            <p className="mt-2 text-sm text-slate-600">Your free report and recommended fixes remain available now.</p>
           </AppCard>
         )}
       </section>

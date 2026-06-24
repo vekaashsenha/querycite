@@ -367,7 +367,7 @@ export function HomeExperience() {
               Find why AI search is not citing your brand, then get ready-to-use AEO/GEO fixes.
             </h1>
             <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-700">
-              QueryCite audits your website for AI crawler readiness, entity clarity, structured data, answer coverage, and practical AEO/GEO fix opportunities.
+              Scan crawler access, entity clarity, schema, and answer coverage—then turn the gaps into practical fixes.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link href="/#audit" className="inline-flex min-h-12 items-center justify-center rounded-full bg-slate-950 px-6 text-sm font-semibold text-white shadow-lg shadow-slate-950/10 transition hover:-translate-y-0.5 hover:bg-slate-800">Run Free AI Visibility Audit</Link>
@@ -413,7 +413,15 @@ export function HomeExperience() {
 
       <section className="px-5 pb-10 sm:px-8">
         <div className="mx-auto grid max-w-7xl gap-3 rounded-3xl border border-white/70 bg-white/78 p-4 shadow-sm sm:grid-cols-2 lg:grid-cols-5">
-          {valueItems.map((item) => <div key={item} className="rounded-2xl bg-white p-4 text-center text-sm font-semibold text-slate-700">{item}</div>)}
+          {valueItems.map((item, index) => (
+            <div key={item} className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+              <FeatureGlyph title={item} />
+              <p className="mt-3 text-sm font-semibold text-slate-800">{item}</p>
+              <div className="mt-3 h-1.5 rounded-full bg-slate-100" aria-hidden="true">
+                <div className="h-1.5 rounded-full bg-violet-600" style={{ width: `${52 + index * 9}%` }} />
+              </div>
+            </div>
+          ))}
         </div>
       </section>
 
@@ -422,7 +430,7 @@ export function HomeExperience() {
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-700">Why QueryCite is different</p>
             <h2 className="mt-3 text-3xl font-semibold leading-tight text-slate-950">Free checkers show your score. QueryCite turns the score into fixes.</h2>
-            <p className="mt-4 text-sm leading-6 text-slate-600">The report connects AI visibility scoring to crawler access, llms.txt guidance, schema, metadata, content, developer notes, and export-ready next steps.</p>
+            <p className="mt-4 text-sm leading-6 text-slate-600">Move from a score to crawler, schema, content, and developer actions.</p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             {["Crawler readiness details", "llms.txt draft", "Ready-to-paste fixes", "Developer action notes"].map((item) => (
@@ -437,7 +445,7 @@ export function HomeExperience() {
       {scanState === "complete" && report && canShowReport ? <ReportPreview report={report} /> : null}
 
       <section id="product" className="px-5 py-16 sm:px-8">
-        <SectionHeader eyebrow="The problem" title="Brands are invisible when AI cannot confidently cite them" description="AI search needs clear entities, answer-ready content, proof, structured data, and focused fixes. QueryCite turns those gaps into a practical report." />
+        <SectionHeader eyebrow="The problem" title="Brands are invisible when AI cannot explain them clearly" description="Weak entity, answer, proof, or schema signals create avoidable visibility gaps." />
         <div className="mx-auto mt-10 grid max-w-7xl gap-5 md:grid-cols-3">
           {problemCards.map(([title, description]) => (
             <ClayCard key={title}>
@@ -449,7 +457,7 @@ export function HomeExperience() {
       </section>
 
       <section className="px-5 py-16 sm:px-8">
-        <SectionHeader eyebrow="The solution" title="AI Visibility Audit plus AEO/GEO Fix Generator" description="QueryCite shows where AI search readiness breaks down and prepares practical fixes your content, SEO, and web teams can review." />
+        <SectionHeader eyebrow="The solution" title="Audit the gaps. Apply the fixes." description="Prioritized actions for content, marketing, SEO, and developer teams." />
         <div className="mx-auto mt-10 grid max-w-7xl gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {featureCards.map(([title, description]) => (
             <ClayCard key={title} className="transition hover:-translate-y-1">
@@ -462,12 +470,12 @@ export function HomeExperience() {
       </section>
 
       <section id="how-it-works" className="px-5 py-16 sm:px-8">
-        <SectionHeader eyebrow="How it works" title="From URL to action plan" description="Enter a website, get an AI visibility report, then apply AEO/GEO fixes with your marketing, content, and developer teams." />
+        <SectionHeader eyebrow="How it works" title="Three steps from URL to action" description="A simple audit flow for clearer AI visibility priorities." />
         <div className="mx-auto mt-10 grid max-w-7xl gap-5 md:grid-cols-3">
           {[
-            ["Enter your website", "Add your domain or full URL to start the audit flow."],
-            ["Get AI visibility report", "Review AI crawler readiness, schema clarity, content signals, and priority gaps."],
-            ["Apply AEO/GEO fixes", "Use recommendations, developer notes, and ready-to-paste fixes to improve readiness."],
+            ["Scan your website", "Check crawler, schema, content, and entity signals."],
+            ["Find AI visibility gaps", "See scores, severity, and priority recommendations."],
+            ["Apply AEO/GEO fixes", "Use ready-to-review content and developer actions."],
           ].map(([step, description], index) => (
             <ClayCard key={step}>
               <div className="text-4xl font-semibold leading-none text-violet-700">0{index + 1}</div>
@@ -479,7 +487,7 @@ export function HomeExperience() {
       </section>
 
       <section id="use-cases" className="px-5 py-16 sm:px-8">
-        <SectionHeader eyebrow="Built for" title="Built for teams responsible for AI search readiness" description="QueryCite is designed for practical brand, content, SEO, and agency workflows without promising citations or rankings." />
+        <SectionHeader eyebrow="Built for" title="One report, clear owners" description="Practical workflows for brand, content, SEO, developer, and agency teams." />
         <div className="mx-auto mt-10 grid max-w-7xl gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {useCases.map(([title, description]) => (
             <ClayCard key={title}>
@@ -496,7 +504,7 @@ export function HomeExperience() {
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-700">Pricing</p>
             <h2 className="mt-3 text-4xl font-semibold leading-tight text-slate-950">Start with a free audit. Unlock the full fix plan when you&apos;re ready.</h2>
-            <p className="mt-4 text-base leading-7 text-slate-600">QueryCite shows your AI visibility gaps for free, then unlocks the complete AEO/GEO action plan, AI Advisor, and export-ready reports in paid plans.</p>
+            <p className="mt-4 text-base leading-7 text-slate-600">Free scores first. Full fixes, Advisor guidance, and exports when you need them.</p>
             <div className="mt-6"><PrimaryLink href="/pricing">View pricing</PrimaryLink></div>
           </div>
           <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">

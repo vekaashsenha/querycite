@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { StatusPill } from "@/components/ui";
 import { advisorActionCosts, planLimits, type AdvisorActionType, type PaidPlanName } from "@/lib/plans";
 
@@ -8,14 +8,14 @@ const quickActions: Array<{ label: string; prompt: string; actionType: AdvisorAc
   { label: "Explain my score", prompt: "Explain my AI Visibility Score and what is helping or hurting it.", actionType: "chat" },
   { label: "What should I fix first?", prompt: "What should I fix first based on effort and impact?", actionType: "chat" },
   { label: "Generate AEO/GEO fix plan", prompt: "Generate a practical AEO/GEO fix plan from this report.", actionType: "fix_pack" },
-  { label: "Generate blog ideas from gaps", prompt: "Generate blog and content brief ideas from the gaps in this report.", actionType: "blog_brief" },
-  { label: "Create developer action notes", prompt: "Create developer action notes from this report.", actionType: "fix_pack" },
-  { label: "Compare me with competitors", prompt: "Compare my site with saved competitors and identify the strongest gaps.", actionType: "competitor_advice" },
-  { label: "Create 30-day visibility plan", prompt: "Create a 30-day AI visibility readiness action plan.", actionType: "chat" },
+  { label: "Generate blog ideas", prompt: "Generate five blog ideas from the gaps in this report.", actionType: "blog_brief" },
+  { label: "Create developer notes", prompt: "Create developer action notes from this report.", actionType: "fix_pack" },
+  { label: "Compare competitors", prompt: "Compare my site with saved competitors and identify the strongest gaps.", actionType: "competitor_advice" },
+  { label: "Create 30-day plan", prompt: "Create a 30-day AI visibility readiness action plan.", actionType: "chat" },
 ];
 
 const maxMessageLength = 900;
-const advisorErrorCopy = "AI Advisor could not respond right now. Please try again.";
+const normalUserErrorCopy = "AI Visibility Advisor is being tuned for beta. Your report and recommended fixes are available now.";
 
 type AdvisorMessage = {
   id: string;
@@ -28,6 +28,31 @@ type UsageState = {
   blogBriefsUsed: number;
   fixPacksUsed: number;
   competitorAdviceUsed: number;
+};
+
+type AdvisorError = {
+  code?: string;
+  message?: string;
+  retryable?: boolean;
+};
+
+type AdvisorDiagnostics = {
+  status: "ready" | "error";
+  geminiKey: "configured" | "missing";
+  reportContext: "found" | "missing";
+  accessState: "admin" | "paid" | "free";
+  lastError: string | null;
+  responseLength: number;
+  modelUsed: string;
+  retried: boolean;
+};
+
+type AdvisorApiResponse = {
+  reply?: string;
+  error?: string | AdvisorError;
+  usage?: UsageState;
+  diagnostics?: AdvisorDiagnostics;
+  diagnosticMessage?: string;
 };
 
 type AdvisorChatProps = {
@@ -48,12 +73,8 @@ function createMessage(role: AdvisorMessage["role"], content: string): AdvisorMe
   };
 }
 
-function splitResponse(content: string) {
-  return content.split(/\n{2,}|\n-/).map((part) => part.trim()).filter(Boolean);
-}
-
 function formatDate(value?: string | null) {
-  return value ? new Date(value).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "-";
+  return value ? new Date(value).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "Not scheduled";
 }
 
 function hasReportData(value: unknown) {
@@ -76,6 +97,16 @@ function nextLocalUsage(usage: UsageState, actionType: AdvisorActionType): Usage
   };
 }
 
+function errorDetails(data: AdvisorApiResponse) {
+  if (typeof data.error === "string") {
+    return { code: "request_error", message: data.error };
+  }
+  return {
+    code: data.error?.code || "backend_error",
+    message: data.error?.message || normalUserErrorCopy,
+  };
+}
+
 function UsageMeter({ label, used, total }: { label: string; used: number; total: number }) {
   const pct = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 100;
   return (
@@ -84,10 +115,36 @@ function UsageMeter({ label, used, total }: { label: string; used: number; total
         <span>{label}</span>
         <span>{used} / {total}</span>
       </div>
-      <div className="mt-2 h-2 rounded-full bg-slate-100">
-        <div className="h-2 rounded-full bg-violet-600" style={{ width: `${pct}%` }} />
+      <div className="mt-2 h-2 rounded-full bg-slate-100" role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={total} aria-valuenow={used}>
+        <div className="h-2 rounded-full bg-violet-600 transition-[width]" style={{ width: `${pct}%` }} />
       </div>
     </div>
+  );
+}
+
+function DiagnosticsPanel({ diagnostics, diagnosticMessage, hasData }: { diagnostics: AdvisorDiagnostics | null; diagnosticMessage: string; hasData: boolean }) {
+  return (
+    <details className="mt-5 rounded-2xl border border-cyan-200 bg-cyan-50/80 p-4">
+      <summary className="cursor-pointer text-sm font-semibold text-cyan-950">AI Advisor diagnostics</summary>
+      <div className="mt-4 grid gap-2 text-xs font-semibold text-slate-700 sm:grid-cols-2">
+        {[
+          ["AI Advisor status", diagnostics?.status || "checking"],
+          ["Gemini key", diagnostics?.geminiKey || "checking"],
+          ["Report context", hasData ? "found" : "missing"],
+          ["Access state", diagnostics?.accessState || "admin"],
+          ["Last error", diagnostics?.lastError || "none"],
+          ["Response length", String(diagnostics?.responseLength ?? 0)],
+          ["Model used", diagnostics?.modelUsed || "checking"],
+          ["Short-answer retry", diagnostics?.retried ? "used" : "not used"],
+        ].map(([label, value]) => (
+          <div key={label} className="flex items-center justify-between gap-3 rounded-xl border border-cyan-100 bg-white px-3 py-2">
+            <span className="text-slate-500">{label}</span>
+            <span className="break-all text-right text-slate-950">{value}</span>
+          </div>
+        ))}
+      </div>
+      {diagnosticMessage ? <p className="mt-3 rounded-xl border border-cyan-100 bg-white p-3 text-xs font-semibold leading-5 text-cyan-950">{diagnosticMessage}</p> : null}
+    </details>
   );
 }
 
@@ -95,13 +152,16 @@ export function AdvisorChat({ currentReportData, companyProfile, competitorData,
   const [messages, setMessages] = useState<AdvisorMessage[]>([
     createMessage(
       "assistant",
-      "I am QueryCite AI Visibility Advisor. I can help explain this report, prioritize AEO/GEO fixes, generate developer notes, and turn gaps into next steps.",
+      "Ask about your score, highest-priority fixes, content gaps, competitor readiness, or developer actions. I will stay grounded in this report.",
     ),
   ]);
   const [input, setInput] = useState("");
   const [usage, setUsage] = useState<UsageState>({ creditsUsed: 0, blogBriefsUsed: 0, fixPacksUsed: 0, competitorAdviceUsed: 0 });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [diagnostics, setDiagnostics] = useState<AdvisorDiagnostics | null>(null);
+  const [diagnosticMessage, setDiagnosticMessage] = useState("");
+  const chatContainerRef = useRef<HTMLDivElement>(null);
   const limits = planLimits[planType] || planLimits.free;
   const isFree = planType === "free";
   const isAdminQa = planType === "adminQa";
@@ -113,12 +173,50 @@ export function AdvisorChat({ currentReportData, companyProfile, competitorData,
     [messages],
   );
 
+  useEffect(() => {
+    const container = chatContainerRef.current;
+    if (container) {
+      container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
+    }
+  }, [messages, isLoading]);
+
+  useEffect(() => {
+    if (!isAdminQa) return;
+
+    let active = true;
+    fetch("/api/advisor/chat", { method: "GET" })
+      .then(async (response) => {
+        const data = (await response.json()) as { diagnostics?: AdvisorDiagnostics };
+        if (active && response.ok && data.diagnostics) {
+          setDiagnostics({ ...data.diagnostics, reportContext: hasData ? "found" : "missing" });
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setDiagnostics({
+            status: "error",
+            geminiKey: "missing",
+            reportContext: hasData ? "found" : "missing",
+            accessState: "admin",
+            lastError: "backend_error",
+            responseLength: 0,
+            modelUsed: "unavailable",
+            retried: false,
+          });
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [hasData, isAdminQa]);
+
   if (!hasData) {
     return (
       <div className="rounded-3xl border border-amber-200 bg-amber-50/70 p-6 shadow-lg">
         <StatusPill tone="amber">AI Visibility Advisor</StatusPill>
         <h3 className="mt-4 text-2xl font-semibold text-slate-950">Run an audit first to activate AI Advisor.</h3>
-        <p className="mt-2 text-sm leading-6 text-slate-700">Advisor answers are report-specific and do not work without current audit data.</p>
+        <p className="mt-2 text-sm leading-6 text-slate-700">Advisor answers use the current audit as their source of truth.</p>
       </div>
     );
   }
@@ -135,7 +233,7 @@ export function AdvisorChat({ currentReportData, companyProfile, competitorData,
           <div>
             <StatusPill tone="slate">Locked</StatusPill>
             <h3 className="mt-3 text-2xl font-semibold text-slate-950">AI Visibility Advisor</h3>
-            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-600">Unlock AI Visibility Advisor to ask report-specific questions and generate AEO/GEO fixes.</p>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-600">Unlock report-specific explanations, fix plans, developer notes, and competitor guidance.</p>
           </div>
         </div>
       </div>
@@ -163,6 +261,7 @@ export function AdvisorChat({ currentReportData, companyProfile, competitorData,
     setMessages((current) => [...current, userMessage]);
     setInput("");
     setError("");
+    setDiagnosticMessage("");
     setIsLoading(true);
 
     try {
@@ -182,17 +281,22 @@ export function AdvisorChat({ currentReportData, companyProfile, competitorData,
         }),
       });
 
-      const data = (await response.json()) as { reply?: string; error?: string; usage?: UsageState };
+      const data = (await response.json()) as AdvisorApiResponse;
       if (!response.ok || !data.reply) {
-        throw new Error(data.error || advisorErrorCopy);
+        const details = errorDetails(data);
+        if (data.diagnostics) setDiagnostics(data.diagnostics);
+        if (data.diagnosticMessage) setDiagnosticMessage(data.diagnosticMessage);
+        throw new Error(isAdminQa ? `${details.code}: ${data.diagnosticMessage || details.message}` : details.message);
       }
 
-      setMessages((current) => [...current, createMessage("assistant", data.reply ?? advisorErrorCopy)]);
-      setUsage(data.usage ?? nextLocalUsage(usage, actionType));
+      setMessages((current) => [...current, createMessage("assistant", data.reply || normalUserErrorCopy)]);
+      setUsage((current) => data.usage ?? nextLocalUsage(current, actionType));
+      if (data.diagnostics) setDiagnostics(data.diagnostics);
+      if (data.diagnosticMessage) setDiagnosticMessage(data.diagnosticMessage);
     } catch (advisorError) {
-      const message = advisorError instanceof Error ? advisorError.message : advisorErrorCopy;
+      const message = isAdminQa && advisorError instanceof Error ? advisorError.message : normalUserErrorCopy;
       setError(message);
-      setMessages((current) => [...current, createMessage("assistant", message)]);
+      setMessages((current) => [...current, createMessage("assistant", isAdminQa ? `Admin diagnostic: ${message}` : normalUserErrorCopy)]);
     } finally {
       setIsLoading(false);
     }
@@ -208,12 +312,12 @@ export function AdvisorChat({ currentReportData, companyProfile, competitorData,
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="text-2xl font-semibold text-slate-950">AI Visibility Advisor</h3>
-          <p className="mt-2 text-sm leading-6 text-slate-600">Report-specific Advisor for AEO/GEO fixes, crawler readiness, competitor gaps, content improvements, developer notes, and next steps.</p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">Turn this audit into prioritized content, technical, and AEO/GEO actions.</p>
         </div>
-        <StatusPill tone={isAdminQa ? "cyan" : "violet"}>{isAdminQa ? "Admin QA mode" : planType === "betaFullReport" ? "Beta preview" : "Paid access"}</StatusPill>
+        <StatusPill tone={isAdminQa ? "cyan" : "violet"}>{isAdminQa ? "QA" : planType === "betaFullReport" ? "Beta preview" : "Paid access"}</StatusPill>
       </div>
 
-      {isAdminQa ? <p className="mt-5 rounded-2xl border border-cyan-200 bg-cyan-50 p-4 text-sm font-semibold leading-6 text-cyan-900">Admin QA mode: usage limits relaxed for testing.</p> : null}
+      {isAdminQa ? <DiagnosticsPanel diagnostics={diagnostics} diagnosticMessage={diagnosticMessage} hasData={hasData} /> : null}
 
       <div className="mt-5 grid gap-3 md:grid-cols-4">
         <UsageMeter label="Advisor credits" used={usage.creditsUsed} total={limits.advisorCredits} />
@@ -221,20 +325,20 @@ export function AdvisorChat({ currentReportData, companyProfile, competitorData,
         <UsageMeter label="Fix packs" used={usage.fixPacksUsed} total={limits.fixPacks} />
         <div className="rounded-2xl border border-violet-100 bg-white p-3 text-xs font-semibold leading-5 text-slate-600">
           <p>Resets on</p>
-          <p className="mt-1 text-sm text-slate-950">{formatDate(resetDate)}</p>
+          <p className="mt-1 text-sm text-slate-950">{isAdminQa ? "QA limits relaxed" : formatDate(resetDate)}</p>
         </div>
       </div>
 
       <div className="mt-5 rounded-2xl border border-violet-100 bg-white p-4">
         <p className="text-sm font-semibold text-slate-950">Quick actions</p>
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {quickActions.map((action) => (
             <button
               key={action.label}
               type="button"
               disabled={isLoading || wouldExceedLimit(usage, planType, action.actionType)}
               onClick={() => void sendMessage(action.prompt, action.actionType)}
-              className="rounded-full border border-violet-100 bg-violet-50 px-3 py-1.5 text-left text-xs font-semibold text-violet-800 transition hover:border-violet-300 hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-55"
+              className="rounded-2xl border border-violet-100 bg-violet-50 px-3 py-2.5 text-left text-xs font-semibold text-violet-900 transition hover:border-violet-300 hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-55"
             >
               {action.label}
             </button>
@@ -242,18 +346,14 @@ export function AdvisorChat({ currentReportData, companyProfile, competitorData,
         </div>
       </div>
 
-      <div className="mt-4 grid max-h-[420px] gap-3 overflow-y-auto pr-1">
+      <div ref={chatContainerRef} className="mt-4 grid max-h-[460px] gap-3 overflow-y-auto overscroll-contain pr-1" aria-live="polite">
         {messages.map((message) => (
           <div key={message.id} className={`rounded-2xl border p-4 ${message.role === "assistant" ? "border-slate-200 bg-white" : "border-violet-100 bg-violet-100/70"}`}>
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{message.role === "assistant" ? "Advisor" : "You"}</p>
-            <div className="mt-2 grid gap-2 text-sm leading-6 text-slate-700">
-              {splitResponse(message.content).map((part) => (
-                <p key={part}>{part}</p>
-              ))}
-            </div>
+            <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">{message.content}</div>
           </div>
         ))}
-        {isLoading ? <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm font-semibold text-slate-600">AI Advisor is reviewing this report...</div> : null}
+        {isLoading ? <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm font-semibold text-slate-600">AI Advisor is thinking…</div> : null}
       </div>
 
       {error ? <p className="mt-4 rounded-2xl border border-rose-100 bg-rose-50 p-3 text-sm font-semibold text-rose-700">{error}</p> : null}
@@ -275,14 +375,14 @@ export function AdvisorChat({ currentReportData, companyProfile, competitorData,
             className="min-h-12 flex-1 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-700 outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100 disabled:bg-slate-100 disabled:text-slate-500"
           />
           <button type="submit" disabled={isLoading || input.trim().length === 0 || usage.creditsUsed >= limits.advisorCredits} className="min-h-12 rounded-2xl bg-slate-950 px-5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300">
-            {isLoading ? "Sending..." : "Send"}
+            {isLoading ? "Thinking…" : "Send"}
           </button>
         </div>
         <p className={`text-xs font-semibold ${remainingCharacters < 80 ? "text-amber-700" : "text-slate-500"}`}>{remainingCharacters} characters remaining</p>
       </form>
 
-      <p className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 text-xs font-semibold leading-5 text-slate-600">
-        AI Advisor can only help with this report, AEO/GEO fixes, competitor gaps, content improvements, developer notes, and next steps. It does not guarantee AI citations, rankings, traffic, revenue, or search positions.
+      <p className="mt-4 text-xs font-semibold leading-5 text-slate-500">
+        Recommendations improve AI visibility readiness; they do not guarantee citations, rankings, traffic, revenue, or search positions.
       </p>
     </div>
   );

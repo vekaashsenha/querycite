@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { FormEvent, useState } from "react";
 import { RazorpayCheckoutButton } from "@/components/RazorpayCheckoutButton";
@@ -44,14 +44,13 @@ export function IimaBetaOffer({ name, email }: IimaBetaOfferProps) {
       const data = (await response.json()) as CouponResponse;
 
       if (!response.ok || !data.valid || !data.code) {
-        throw new Error(data.error || couponError);
+        throw new Error(couponError);
       }
 
       setAppliedCode(data.code);
-      setCouponCode(data.code);
-      setMessage(data.message || successMessage);
-    } catch (couponApplyError) {
-      setError(couponApplyError instanceof Error ? couponApplyError.message : couponError);
+      setMessage(successMessage);
+    } catch {
+      setError(couponError);
     } finally {
       setIsValidating(false);
     }
@@ -59,41 +58,48 @@ export function IimaBetaOffer({ name, email }: IimaBetaOfferProps) {
 
   return (
     <section className="mx-auto mt-8 max-w-6xl overflow-hidden rounded-3xl border border-cyan-200 bg-gradient-to-r from-cyan-50 via-white to-violet-50 p-6 shadow-sm">
-      <div className="grid gap-6 lg:grid-cols-[1fr_0.9fr] lg:items-center">
+      <div className="grid gap-6 lg:grid-cols-[0.92fr_1.08fr] lg:items-center">
         <div>
-          <StatusPill tone="cyan">Cohort beta access</StatusPill>
+          <StatusPill tone="cyan">IIMA beta offer</StatusPill>
           <h2 className="mt-4 text-2xl font-semibold text-slate-950">Exclusive IIMA Beta Offer</h2>
-          <div className="mt-4 grid gap-2 text-sm font-semibold leading-6 text-slate-700">
-            <p>For AGMP18 and DMBPT02 cohort members</p>
-            <p>$2 equivalent</p>
-            <p className="text-slate-950">Pay ₹199 for 1-month paid beta access</p>
+          <p className="mt-2 text-sm font-semibold text-slate-700">For AGMP18 and DMBPT02 cohort members</p>
+          <div className="mt-5 flex flex-wrap items-end gap-3">
+            <p className="text-3xl font-semibold text-slate-950">₹199</p>
+            <p className="pb-1 text-sm font-semibold text-slate-500">$2 equivalent</p>
           </div>
-          <p className="mt-4 text-xs font-semibold leading-5 text-slate-500">Use only the cohort code shared with you. This cohort beta access is privately shared for feedback.</p>
+          <p className="mt-2 text-sm font-semibold text-slate-950">Pay ₹199 for 1-month paid beta access</p>
+          <div className="mt-5 grid grid-cols-3 gap-2 text-center text-xs font-semibold text-slate-700">
+            {["Full report", "AI Advisor", "1 month"].map((item) => (
+              <div key={item} className="rounded-2xl border border-white/80 bg-white p-3 shadow-sm">{item}</div>
+            ))}
+          </div>
         </div>
 
         <div className="rounded-3xl border border-white/80 bg-white p-5 shadow-sm">
-          <form onSubmit={applyCoupon} className="grid gap-3 sm:grid-cols-[1fr_auto]">
-            <input
-              type="text"
-              value={couponCode}
-              onChange={(event) => {
-                setCouponCode(event.target.value.toUpperCase());
-                setMessage("");
-                setError("");
-                setAppliedCode("");
-              }}
-              placeholder="Enter coupon code"
-              className="min-h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-800 outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
-            />
-            <button type="submit" disabled={isValidating || couponCode.trim().length === 0} className="min-h-12 rounded-2xl bg-slate-950 px-5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300">
-              {isValidating ? "Applying..." : "Apply"}
-            </button>
+          <form onSubmit={applyCoupon} className="grid gap-3">
+            <label htmlFor="cohort-coupon" className="text-sm font-semibold text-slate-700">Enter your cohort coupon code</label>
+            <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+              <input
+                id="cohort-coupon"
+                type="text"
+                value={couponCode}
+                onChange={(event) => {
+                  setCouponCode(event.target.value.toUpperCase());
+                  setMessage("");
+                  setError("");
+                  setAppliedCode("");
+                }}
+                placeholder="Enter coupon code"
+                autoComplete="off"
+                className="min-h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-800 outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
+              />
+              <button type="submit" disabled={isValidating || couponCode.trim().length === 0} className="min-h-12 rounded-2xl bg-slate-950 px-5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300">
+                {isValidating ? "Applying…" : "Apply"}
+              </button>
+            </div>
           </form>
 
-          <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-slate-500">
-            <span className="rounded-full bg-slate-100 px-3 py-1">IIMA-AGMP18</span>
-            <span className="rounded-full bg-slate-100 px-3 py-1">IIMA-DMBPT02</span>
-          </div>
+          <p className="mt-4 text-xs font-semibold leading-5 text-slate-500">Use the private code shared with your cohort. Payment amount and eligibility are verified on the server.</p>
 
           {message ? <p className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50 p-3 text-sm font-semibold leading-6 text-emerald-900">{message}</p> : null}
           {error ? <p className="mt-4 rounded-2xl border border-amber-100 bg-amber-50 p-3 text-sm font-semibold leading-6 text-amber-900">{error}</p> : null}
@@ -107,7 +113,7 @@ export function IimaBetaOffer({ name, email }: IimaBetaOfferProps) {
                 name={name}
                 email={email}
                 buttonLabel="Pay ₹199"
-                helperText="IIMA beta offer applied. Final amount: ₹199. Access valid for 1 month."
+                helperText={successMessage}
               />
             </div>
           ) : null}

@@ -13,7 +13,6 @@ type DashboardUser = {
 type NavItem = {
   label: string;
   href: string;
-  hint?: string;
 };
 
 const primaryItems: NavItem[] = [
@@ -103,7 +102,6 @@ function AccountMenu({ user }: { user: DashboardUser }) {
         <span className="hidden leading-tight sm:block">
           <span className="block text-sm font-semibold text-slate-950">{displayName}</span>
           <span className="block max-w-48 truncate text-xs font-medium text-slate-500">{user.email}</span>
-          {user.isAdmin ? <span className="mt-1 inline-flex rounded-full border border-cyan-200 bg-cyan-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-cyan-800">Admin preview</span> : null}
         </span>
       </button>
       {open ? (
@@ -111,7 +109,7 @@ function AccountMenu({ user }: { user: DashboardUser }) {
           <div className="border-b border-slate-100 p-4">
             <p className="text-sm font-semibold text-slate-950">{displayName}</p>
             <p className="mt-1 truncate text-xs font-medium text-slate-500">{user.email}</p>
-            {user.isAdmin ? <p className="mt-2 inline-flex rounded-full border border-cyan-200 bg-cyan-50 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-cyan-800">QA mode</p> : null}
+            {user.isAdmin ? <p className="mt-2 inline-flex rounded-full border border-cyan-200 bg-cyan-50 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-cyan-800">Admin QA</p> : null}
           </div>
           <div className="grid p-2 text-sm font-semibold text-slate-700">
             {[
@@ -157,7 +155,7 @@ export function DashboardShell({ user, title, description, children, badge }: { 
           </div>
           <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Access</p>
-            <p className="mt-2 text-sm font-semibold leading-6 text-white">Free reports stay available. Full Advisor access remains gated by verified paid status.</p>
+            <p className="mt-2 text-sm font-semibold leading-6 text-white">Free reports stay available. Full Advisor tools require verified access.</p>
           </div>
           <form action="/api/auth/logout" method="post" className="mt-5">
             <button type="submit" className="flex min-h-10 w-full items-center gap-3 rounded-xl px-3 text-sm font-semibold text-slate-300 transition hover:bg-white/8 hover:text-white">
@@ -168,7 +166,7 @@ export function DashboardShell({ user, title, description, children, badge }: { 
         </aside>
 
         <section className="min-w-0">
-          <div className="sticky top-16 z-20 mb-5 rounded-[1.15rem] border border-slate-200 bg-white/92 p-3 shadow-sm backdrop-blur lg:top-24">
+          <div className="mb-5 rounded-[1.15rem] border border-slate-200 bg-white p-3 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-3">
                 <button type="button" onClick={() => setMobileOpen(true)} className="grid size-10 place-items-center rounded-xl border border-slate-200 bg-white text-slate-950 lg:hidden" aria-label="Open workspace navigation">
@@ -177,7 +175,7 @@ export function DashboardShell({ user, title, description, children, badge }: { 
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <h1 className="truncate text-xl font-semibold text-slate-950 sm:text-2xl">{title}</h1>
-                    {badge ? badge : null}
+                    {badge || null}
                   </div>
                   <p className="mt-1 hidden max-w-3xl text-sm leading-6 text-slate-600 sm:block">{description}</p>
                 </div>
