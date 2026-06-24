@@ -45,6 +45,8 @@ type AdvisorDiagnostics = {
   providerStatus: number | null;
   retryCount: number;
   responseLength: number;
+  responseComplete: boolean;
+  finishReason: string | null;
   modelUsed: string;
   finalFailureReason: string | null;
 };
@@ -136,8 +138,10 @@ function DiagnosticsPanel({ diagnostics, diagnosticMessage, hasData }: { diagnos
           ["Access state", diagnostics?.accessState || "admin"],
           ["Last error", diagnostics?.lastError || "none"],
           ["Provider status", diagnostics?.providerStatus ? String(diagnostics.providerStatus) : "none"],
-          ["Retry count", String(diagnostics?.retryCount ?? 0)],
+          ["Retries used", String(diagnostics?.retryCount ?? 0)],
+          ["Response complete", diagnostics?.responseComplete ? "true" : "false"],
           ["Response length", String(diagnostics?.responseLength ?? 0)],
+          ["Finish reason", diagnostics?.finishReason || "not available"],
           ["Model used", diagnostics?.modelUsed || "checking"],
           ["Final failure", diagnostics?.finalFailureReason || "none"],
         ].map(([label, value]) => (
@@ -206,6 +210,8 @@ export function AdvisorChat({ currentReportData, companyProfile, competitorData,
             providerStatus: null,
             retryCount: 0,
             responseLength: 0,
+            responseComplete: false,
+            finishReason: null,
             modelUsed: "unavailable",
             finalFailureReason: "Diagnostics endpoint could not be reached.",
           });
@@ -352,11 +358,11 @@ export function AdvisorChat({ currentReportData, companyProfile, competitorData,
         </div>
       </div>
 
-      <div ref={chatContainerRef} className="mt-4 grid max-h-[460px] gap-3 overflow-y-auto overscroll-contain pr-1" aria-live="polite">
+      <div ref={chatContainerRef} className="mt-4 grid max-h-[640px] gap-3 overflow-y-auto overscroll-contain pr-1" aria-live="polite">
         {messages.map((message) => (
           <div key={message.id} className={`rounded-2xl border p-4 ${message.role === "assistant" ? "border-slate-200 bg-white" : "border-violet-100 bg-violet-100/70"}`}>
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{message.role === "assistant" ? "Advisor" : "You"}</p>
-            <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">{message.content}</div>
+            <div className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">{message.content}</div>
           </div>
         ))}
         {isLoading ? <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm font-semibold text-slate-600">AI Advisor is thinking...</div> : null}

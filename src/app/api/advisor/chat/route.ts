@@ -2,6 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 import { NextResponse } from "next/server";
 import { getPaidAccessContextForUser } from "@/lib/paid-foundation";
 import { AdvisorGenerationError, generateAdvisorWithResilience } from "@/lib/advisor-provider";
+import { buildAdvisorPrompts, buildStructuredAdvisorFallback } from "@/lib/advisor-context";
 import { getGeminiModelSequence } from "@/lib/gemini";
 import { advisorActionCosts, normalizePaidPlanName, planLimits, type AdvisorActionType, type PaidPlanName } from "@/lib/plans";
 import { getCurrentUser, syncAuthenticatedUser } from "@/lib/auth/server";
@@ -47,6 +48,7 @@ type AdvisorErrorCode =
   | "invalid_key"
   | "model_error"
   | "empty_response"
+  | "incomplete_response"
   | "provider_error"
   | "backend_error";
 
@@ -61,6 +63,8 @@ type AdvisorDiagnostics = {
   providerStatus: number | null;
   retryCount: number;
   responseLength: number;
+  responseComplete: boolean;
+  finishReason: string | null;
   modelUsed: string;
   finalFailureReason: string | null;
 };
@@ -123,72 +127,6 @@ function isBlockedOrUnrelated(message: string) {
   return unrelatedPatterns.some((pattern) => pattern.test(normalized)) && !reportPatterns.some((pattern) => pattern.test(normalized));
 }
 
-function actionInstruction(actionType: AdvisorActionType) {
-  if (actionType === "blog_brief") {
-    return "Return exactly 5 blog ideas. For each include target query, buyer intent, short outline, FAQ/schema angle, and AEO/GEO value.";
-  }
-  if (actionType === "fix_pack") {
-    return "Return a fix pack with issue, why it matters, exact recommendation, effort level, expected impact, implementation note, owner, and priority.";
-  }
-  if (actionType === "competitor_advice") {
-    return "Compare the user site with saved competitors only if competitor data is present. Return comparison summary, gaps, what competitors do better, and recommended action. Do not defame competitors.";
-  }
-  return "Answer the report-specific question with practical next steps.";
-}
-
-function quickActionInstruction(message: string) {
-  const normalized = message.toLowerCase();
-
-  if (normalized.includes("explain my ai visibility score") || normalized.includes("explain my score")) {
-    return "Use these sections: Score meaning; Main reasons; What is good; What needs improvement; Next 3 actions.";
-  }
-  if (normalized.includes("what should i fix first")) {
-    return "Return the Top 3 fixes. For each fix include Effort, Impact, Priority, and the first implementation step.";
-  }
-  if (normalized.includes("aeo/geo fix plan")) {
-    return "Return a 7-day plan and a 30-day plan. Assign each action to marketer, developer, or content owner.";
-  }
-  if (normalized.includes("developer action notes")) {
-    return "For each developer action include issue, technical fix, implementation note, and priority.";
-  }
-  if (normalized.includes("30-day") && normalized.includes("visibility")) {
-    return "Return a week-by-week 30-day plan. Include expected outcome and priority for each week.";
-  }
-
-  return "";
-}
-
-function buildAdvisorPrompt(message: string, currentReportData: unknown, chatHistory: ChatMessage[], companyProfile: unknown, competitorData: unknown, actionType: AdvisorActionType) {
-  return `Current report data, which you must use as the source of truth:
-${JSON.stringify(currentReportData, null, 2)}
-
-Company profile context:
-${JSON.stringify(companyProfile || {}, null, 2)}
-
-Competitor comparison data:
-${JSON.stringify(competitorData || {}, null, 2)}
-
-Recent chat history:
-${JSON.stringify(chatHistory, null, 2)}
-
-User question:
-${message}
-
-Action mode:
-${actionInstruction(actionType)}
-${quickActionInstruction(message)}
-
-Response rules:
-- Answer only about this report, saved reports, company profile, AEO/GEO readiness, citation readiness, competitor gaps, content fixes, developer notes, schema/metadata/internal linking, exports, or 7-day/30-day next steps.
-- If the question is unrelated, answer exactly: ${offTopicReply}
-- Do not guarantee AI citations, rankings, traffic, revenue, or search positions.
-- Use phrases like improve AI visibility readiness, citation-readiness, crawlability, structured clarity, and increase likelihood of being understood by AI/search systems.
-- Every normal response must include: Short diagnosis; Why it matters for AI visibility; Recommended fix; Priority: High, Medium, or Low; Next action.
-- Never return a one-line fragment or fewer than ${MIN_ADVISOR_WORDS} words for a normal answer.
-- Prefer clear headings and bullets. Preserve useful detail without adding generic filler.
-- Target 140-240 words.`;
-}
-
 function sanitizeForbiddenClaims(reply: string) {
   return reply
     .replace(/guaranteed\s+AI\s+ranking/gi, "improved AI visibility readiness")
@@ -196,47 +134,6 @@ function sanitizeForbiddenClaims(reply: string) {
     .replace(/guaranteed\s+traffic/gi, "stronger readiness signals")
     .replace(/guaranteed\s+revenue/gi, "clearer next-step signals")
     .replace(/guaranteed\s+search\s+position/gi, "stronger search readiness");
-}
-
-function reportFallbackDetail(currentReportData: unknown) {
-  if (!currentReportData || typeof currentReportData !== "object") {
-    return {
-      score: "the current audit score",
-      issue: "the highest-priority finding in the report",
-      fix: "review the report findings and implement the highest-priority recommendation first",
-    };
-  }
-
-  const report = currentReportData as {
-    scores?: { aiVisibility?: unknown };
-    findings?: Array<{ issue?: unknown; recommendedFix?: unknown }>;
-  };
-  const firstFinding = Array.isArray(report.findings) ? report.findings[0] : undefined;
-  const numericScore = typeof report.scores?.aiVisibility === "number" ? `${report.scores.aiVisibility}/100` : "the current audit score";
-
-  return {
-    score: numericScore,
-    issue: truncateText(firstFinding?.issue, 220) || "the highest-priority finding in the report",
-    fix: truncateText(firstFinding?.recommendedFix, 320) || "implement the highest-priority recommendation shown in the report",
-  };
-}
-
-function structuredFallback(currentReportData: unknown) {
-  const detail = reportFallbackDetail(currentReportData);
-  return `## Short diagnosis
-Your AI Visibility Score is ${detail.score}. The clearest issue to address first is ${detail.issue}. This suggests the site has useful signals, but some are not explicit or structured enough for AI and search systems to interpret consistently.
-
-## Why it matters for AI visibility
-Clear crawler access, entity signals, answer-ready content, and valid structured data improve citation-readiness and increase the likelihood of the site being understood accurately.
-
-## Recommended fix
-Start with this report-backed action: ${detail.fix}. Validate the change against visible page content and avoid adding claims or schema that the page does not support.
-
-## Priority
-High
-
-## Next action
-Assign the fix to the relevant owner, publish it, then rerun the audit to confirm whether the readiness signals and related score improve.`;
 }
 
 function diagnosticState(input: Partial<AdvisorDiagnostics> & Pick<AdvisorDiagnostics, "accessState">): AdvisorDiagnostics {
@@ -249,8 +146,21 @@ function diagnosticState(input: Partial<AdvisorDiagnostics> & Pick<AdvisorDiagno
     providerStatus: input.providerStatus ?? null,
     retryCount: input.retryCount ?? 0,
     responseLength: input.responseLength ?? 0,
+    responseComplete: input.responseComplete ?? false,
+    finishReason: input.finishReason ?? null,
     modelUsed: input.modelUsed ?? ADVISOR_GEMINI_MODEL,
     finalFailureReason: input.finalFailureReason ?? null,
+  };
+}
+
+function serializeDiagnostics(diagnostics: AdvisorDiagnostics) {
+  return {
+    ...diagnostics,
+    response_complete: diagnostics.responseComplete,
+    response_length: diagnostics.responseLength,
+    finish_reason: diagnostics.finishReason,
+    model_used: diagnostics.modelUsed,
+    retries_used: diagnostics.retryCount,
   };
 }
 
@@ -262,7 +172,7 @@ function structuredError(code: AdvisorErrorCode, status: number, diagnosticMessa
         message: normalUserErrorCopy,
         retryable,
       },
-      ...(diagnostics ? { diagnostics: { ...diagnostics, status: "error", lastError: code }, diagnosticMessage } : {}),
+      ...(diagnostics ? { diagnostics: serializeDiagnostics({ ...diagnostics, status: "error", lastError: code }), diagnosticMessage } : {}),
     },
     { status },
   );
@@ -348,10 +258,10 @@ export async function GET() {
   }
 
   return NextResponse.json({
-    diagnostics: diagnosticState({
+    diagnostics: serializeDiagnostics(diagnosticState({
       accessState: "admin",
       reportContext: "missing",
-    }),
+    })),
   });
 }
 
@@ -428,14 +338,26 @@ export async function POST(request: Request) {
     }
 
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    const prompt = buildAdvisorPrompt(message, body.currentReportData, sanitizeHistory(body.chatHistory), body.companyProfile, body.competitorData, actionType);
+    const promptContext = buildAdvisorPrompts({
+      message,
+      currentReportData: body.currentReportData,
+      companyProfile: body.companyProfile,
+      competitorData: body.competitorData,
+      chatHistory: sanitizeHistory(body.chatHistory),
+      actionType,
+      offTopicReply,
+      minWords: MIN_ADVISOR_WORDS,
+    });
     const generation = await generateAdvisorWithResilience({
       ai,
-      prompt,
+      prompt: promptContext.prompt,
+      retryPrompt: promptContext.retryPrompt,
       actionType,
       systemInstruction,
       minWords: MIN_ADVISOR_WORDS,
-      structuredFallback: () => structuredFallback(body.currentReportData),
+      requiredSections: promptContext.requiredSections,
+      groundingGroups: promptContext.reportContext.groundingGroups,
+      structuredFallback: () => buildStructuredAdvisorFallback(message, actionType, promptContext.reportContext),
     });
     const reply = sanitizeForbiddenClaims(generation.reply);
 
@@ -455,6 +377,8 @@ export async function POST(request: Request) {
           providerStatus: generation.finalFailure?.status ?? null,
           retryCount: generation.retryCount,
           responseLength: generation.responseLength,
+          responseComplete: generation.responseComplete,
+          finishReason: generation.finishReason,
           modelUsed: generation.modelUsed,
           finalFailureReason: generation.finalFailure?.message ?? null,
         })
@@ -466,7 +390,7 @@ export async function POST(request: Request) {
       usage,
       limits: usagePlan,
       resetDate,
-      ...(diagnostics ? { diagnostics } : {}),
+      ...(diagnostics ? { diagnostics: serializeDiagnostics(diagnostics) } : {}),
     });
   } catch (error) {
     if (error instanceof AdvisorGenerationError) {
@@ -478,6 +402,8 @@ export async function POST(request: Request) {
             providerStatus: error.failure.status,
             retryCount: error.retryCount,
             responseLength: error.responseLength,
+            responseComplete: false,
+            finishReason: error.finishReason,
             modelUsed: error.modelUsed,
             finalFailureReason: error.failure.message,
           })
