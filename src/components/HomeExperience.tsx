@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
-import { featureCards, faqs, integrations, useCases } from "@/lib/mock";
+import { faqs, integrations, useCases } from "@/lib/mock";
 import { auditStorageKey, type AuditApiResponse, type WebsiteAuditReport } from "@/lib/audit-report";
 import { normalizeWebsiteUrl, urlErrorMessage } from "@/lib/url";
+import { DoodleConnector, FeatureClusterVisual, WorkflowDoodle } from "@/components/DoodleVisuals";
 import { ClayCard, LockedPanel, PrimaryLink, ScoreRing, SectionHeader, StatusPill } from "@/components/ui";
 
 const scanSteps = ["Fetching homepage", "Checking crawler and llms.txt signals", "Scoring AEO/GEO readiness", "Preparing fix-ready report"];
@@ -15,6 +16,55 @@ const problemCards = [
   ["Competitors may look more citeable", "Brands with clearer positioning, schema, trust signals, and content coverage can appear easier to recommend."],
 ];
 const outputCards = ["Limited branded PDF preview", "CSV findings download", "Share report preview", "Email report preview"];
+
+type FeatureClusterKind = "audit" | "insight" | "intelligence" | "output";
+
+const featureClusters: Array<{
+  kind: FeatureClusterKind;
+  eyebrow: string;
+  title: string;
+  summary: string;
+  bullets: string[];
+  wide: boolean;
+  className: string;
+}> = [
+  {
+    kind: "audit",
+    eyebrow: "Audit & Scores",
+    title: "See the signals AI systems can read",
+    summary: "One scan turns technical and content signals into a clear readiness baseline.",
+    bullets: ["AI Visibility, AEO, and GEO scores", "AI crawler readiness and access checks"],
+    wide: true,
+    className: "border-violet-200 bg-violet-50/70",
+  },
+  {
+    kind: "insight",
+    eyebrow: "Insight & Recommendations",
+    title: "Move from issue to implementation",
+    summary: "Each gap is translated into a practical action for the team that owns it.",
+    bullets: ["llms.txt and content guidance", "Ready-to-paste Fix Pack and developer notes"],
+    wide: false,
+    className: "border-amber-200 bg-amber-50/70",
+  },
+  {
+    kind: "intelligence",
+    eyebrow: "Intelligence & Comparison",
+    title: "Understand the gap, then ask what to do",
+    summary: "Compare readiness signals and use report-grounded guidance to prioritize the work.",
+    bullets: ["Competitor comparison", "AI Visibility Advisor"],
+    wide: false,
+    className: "border-cyan-200 bg-cyan-50/70",
+  },
+  {
+    kind: "output",
+    eyebrow: "Output & Sharing",
+    title: "Hand the plan to the people doing the work",
+    summary: "Package the audit into useful formats for review, implementation, and follow-up.",
+    bullets: ["PDF and CSV reports", "Share and email report workflows"],
+    wide: true,
+    className: "border-emerald-200 bg-emerald-50/70",
+  },
+];
 
 const leadSubmittedKey = "querycite_lead_submitted";
 const leadEmailKey = "querycite_lead_email";
@@ -224,6 +274,28 @@ function FeatureGlyph({ title }: { title: string }) {
   );
 }
 
+function FeatureClusterPanel({ cluster }: { cluster: (typeof featureClusters)[number] }) {
+  return (
+    <article className={`${cluster.wide ? "lg:col-span-7" : "lg:col-span-5"} self-start overflow-hidden rounded-[1.75rem] border p-5 shadow-sm ${cluster.className}`}>
+      <div className={cluster.wide ? "grid gap-5 md:grid-cols-[0.92fr_1.08fr] md:items-center" : "grid gap-5"}>
+        <FeatureClusterVisual kind={cluster.kind} />
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{cluster.eyebrow}</p>
+          <h3 className="mt-2 text-2xl font-semibold leading-tight text-slate-950">{cluster.title}</h3>
+          <p className="mt-3 text-sm leading-6 text-slate-600">{cluster.summary}</p>
+          <div className="mt-4 grid gap-2">
+            {cluster.bullets.map((bullet) => (
+              <div key={bullet} className="flex items-center gap-3 text-sm font-semibold leading-5 text-slate-800">
+                <span className="grid size-6 shrink-0 place-items-center rounded-full border border-slate-200 bg-white" aria-hidden="true"><span className="size-2 rounded-full bg-emerald-500" /></span>
+                <span>{bullet}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </article>
+  );
+}
 function ReportPreview({ report }: { report: WebsiteAuditReport }) {
   return (
     <section id="report-preview" className="mx-auto w-full max-w-7xl px-5 py-10 sm:px-8">
@@ -367,7 +439,7 @@ export function HomeExperience() {
               Find why AI search is not citing your brand, then get ready-to-use AEO/GEO fixes.
             </h1>
             <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-700">
-              Scan crawler access, entity clarity, schema, and answer coverage—then turn the gaps into practical fixes.
+              Scan crawler access, entity clarity, schema, and answer coverage, then turn the gaps into practical fixes.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link href="/#audit" className="inline-flex min-h-12 items-center justify-center rounded-full bg-slate-950 px-6 text-sm font-semibold text-white shadow-lg shadow-slate-950/10 transition hover:-translate-y-0.5 hover:bg-slate-800">Run Free AI Visibility Audit</Link>
@@ -457,32 +529,63 @@ export function HomeExperience() {
       </section>
 
       <section className="px-5 py-16 sm:px-8">
-        <SectionHeader eyebrow="The solution" title="Audit the gaps. Apply the fixes." description="Prioritized actions for content, marketing, SEO, and developer teams." />
-        <div className="mx-auto mt-10 grid max-w-7xl gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {featureCards.map(([title, description]) => (
-            <ClayCard key={title} className="transition hover:-translate-y-1">
-              <FeatureGlyph title={title} />
-              <h3 className="mt-5 text-xl font-semibold leading-7 text-slate-950">{title}</h3>
-              <p className="mt-3 text-sm leading-6 text-slate-600">{description}</p>
-            </ClayCard>
-          ))}
+        <SectionHeader eyebrow="What you get" title="One audit, four connected layers" description="Scores lead to insights, insights lead to action, and the output is ready to share." />
+        <div className="mx-auto mt-10 grid max-w-7xl gap-5 lg:grid-cols-12">
+          {featureClusters.map((cluster) => <FeatureClusterPanel key={cluster.kind} cluster={cluster} />)}
         </div>
       </section>
 
       <section id="how-it-works" className="px-5 py-16 sm:px-8">
-        <SectionHeader eyebrow="How it works" title="Three steps from URL to action" description="A simple audit flow for clearer AI visibility priorities." />
-        <div className="mx-auto mt-10 grid max-w-7xl gap-5 md:grid-cols-3">
-          {[
-            ["Scan your website", "Check crawler, schema, content, and entity signals."],
-            ["Find AI visibility gaps", "See scores, severity, and priority recommendations."],
-            ["Apply AEO/GEO fixes", "Use ready-to-review content and developer actions."],
-          ].map(([step, description], index) => (
-            <ClayCard key={step}>
-              <div className="text-4xl font-semibold leading-none text-violet-700">0{index + 1}</div>
-              <h3 className="mt-4 text-lg font-semibold leading-7 text-slate-950">{step}</h3>
-              <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
-            </ClayCard>
-          ))}
+        <SectionHeader eyebrow="How it works" title="Three steps from URL to action" description="A connected workflow from website signals to implementation-ready fixes." />
+        <div className="relative mx-auto mt-10 max-w-7xl overflow-hidden rounded-[2rem] border border-slate-200 bg-white px-5 py-8 shadow-sm sm:px-8 lg:px-10">
+          <div className="absolute inset-0 opacity-45 surface-grid" aria-hidden="true" />
+          <div className="relative grid items-center gap-3 md:grid-cols-[1fr_auto_1fr_auto_1fr]">
+            <div className="text-center">
+              <div className="mx-auto max-w-xs rounded-[1.5rem] border border-violet-200 bg-violet-50 p-3 shadow-sm">
+                <WorkflowDoodle kind="url" />
+              </div>
+              <div className="mx-auto mt-5 grid size-8 place-items-center rounded-full bg-violet-700 text-xs font-semibold text-white">01</div>
+              <h3 className="mt-3 text-xl font-semibold text-slate-950">Scan your website</h3>
+              <p className="mx-auto mt-2 max-w-xs text-sm leading-6 text-slate-600">Enter a URL and collect crawler, schema, content, and entity signals.</p>
+            </div>
+
+            <div className="grid place-items-center">
+              <span className="hidden md:block"><DoodleConnector /></span>
+              <span className="md:hidden"><DoodleConnector direction="vertical" /></span>
+            </div>
+
+            <div className="text-center">
+              <div className="mx-auto max-w-xs rounded-[1.5rem] border border-cyan-200 bg-cyan-50 p-3 shadow-sm">
+                <WorkflowDoodle kind="scan" />
+              </div>
+              <div className="mx-auto mt-5 grid size-8 place-items-center rounded-full bg-cyan-700 text-xs font-semibold text-white">02</div>
+              <h3 className="mt-3 text-xl font-semibold text-slate-950">Find visibility gaps</h3>
+              <p className="mx-auto mt-2 max-w-xs text-sm leading-6 text-slate-600">Turn raw signals into scores, severity, and a clear order of priority.</p>
+            </div>
+
+            <div className="grid place-items-center">
+              <span className="hidden md:block"><DoodleConnector /></span>
+              <span className="md:hidden"><DoodleConnector direction="vertical" /></span>
+            </div>
+
+            <div className="text-center">
+              <div className="mx-auto max-w-xs rounded-[1.5rem] border border-emerald-200 bg-emerald-50 p-3 shadow-sm">
+                <WorkflowDoodle kind="fix" />
+              </div>
+              <div className="mx-auto mt-5 grid size-8 place-items-center rounded-full bg-emerald-700 text-xs font-semibold text-white">03</div>
+              <h3 className="mt-3 text-xl font-semibold text-slate-950">Apply AEO/GEO fixes</h3>
+              <p className="mx-auto mt-2 max-w-xs text-sm leading-6 text-slate-600">Give content and developer teams concrete, ready-to-review actions.</p>
+            </div>
+          </div>
+
+          <div className="relative mx-auto mt-8 flex max-w-2xl flex-wrap items-center justify-center gap-2 text-xs font-semibold text-slate-600">
+            {['URL', 'Signals', 'Priorities', 'Fixes'].map((label, index) => (
+              <div key={label} className="flex items-center gap-2">
+                {index > 0 ? <span className="text-slate-300" aria-hidden="true">&rarr;</span> : null}
+                <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 shadow-sm">{label}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 

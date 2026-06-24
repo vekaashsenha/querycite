@@ -1,20 +1,20 @@
-import { ApiError, GoogleGenAI, ThinkingLevel } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import { NextResponse } from "next/server";
 import { getPaidAccessContextForUser } from "@/lib/paid-foundation";
-import { getGeminiModel } from "@/lib/gemini";
+import { AdvisorGenerationError, generateAdvisorWithResilience } from "@/lib/advisor-provider";
+import { getGeminiModelSequence } from "@/lib/gemini";
 import { advisorActionCosts, normalizePaidPlanName, planLimits, type AdvisorActionType, type PaidPlanName } from "@/lib/plans";
 import { getCurrentUser, syncAuthenticatedUser } from "@/lib/auth/server";
 import { insertSupabaseRow, isSupabaseAdminConfigured, selectSupabaseRows, updateSupabaseRows } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
-const ADVISOR_GEMINI_MODEL = getGeminiModel("advisor");
+const ADVISOR_GEMINI_MODEL = getGeminiModelSequence("advisor")[0];
 const MAX_MESSAGE_LENGTH = 900;
 const MAX_HISTORY_ITEMS = 8;
 const MIN_ADVISOR_WORDS = 80;
-const ADVISOR_TIMEOUT_MS = 30_000;
 const offTopicReply = "I can only help with this AI Visibility Report, AEO/GEO fixes, competitor gaps, content improvements, developer notes, and next steps.";
-const normalUserErrorCopy = "AI Visibility Advisor is being tuned for beta. Your report and recommended fixes are available now.";
+const normalUserErrorCopy = "AI Visibility Advisor is temporarily busy. Your report and recommended fixes are still available.";
 
 const systemInstruction = `You are QueryCite AI Visibility Advisor. You help users understand and act on their current AI Visibility Audit report. Only answer using the current report data, saved company profile context, saved competitor data, and related AEO/GEO best practices. Do not answer unrelated questions. Do not guarantee AI citations, rankings, traffic, revenue, or search positions. Give practical next steps for marketing, content, and developer teams. Refuse black-hat SEO, spam tactics, scraping bypasses, competitor defamation, and medical, legal, or financial advice.`;
 
@@ -58,9 +58,11 @@ type AdvisorDiagnostics = {
   reportContext: "found" | "missing";
   accessState: AdvisorAccessState;
   lastError: AdvisorErrorCode | null;
+  providerStatus: number | null;
+  retryCount: number;
   responseLength: number;
   modelUsed: string;
-  retried: boolean;
+  finalFailureReason: string | null;
 };
 
 type UsageRow = Record<string, unknown> & {
@@ -196,10 +198,6 @@ function sanitizeForbiddenClaims(reply: string) {
     .replace(/guaranteed\s+search\s+position/gi, "stronger search readiness");
 }
 
-function wordCount(value: string) {
-  return value.trim().split(/\s+/).filter(Boolean).length;
-}
-
 function reportFallbackDetail(currentReportData: unknown) {
   if (!currentReportData || typeof currentReportData !== "object") {
     return {
@@ -248,9 +246,11 @@ function diagnosticState(input: Partial<AdvisorDiagnostics> & Pick<AdvisorDiagno
     reportContext: input.reportContext ?? "found",
     accessState: input.accessState,
     lastError: input.lastError ?? null,
+    providerStatus: input.providerStatus ?? null,
+    retryCount: input.retryCount ?? 0,
     responseLength: input.responseLength ?? 0,
-    modelUsed: ADVISOR_GEMINI_MODEL,
-    retried: input.retried ?? false,
+    modelUsed: input.modelUsed ?? ADVISOR_GEMINI_MODEL,
+    finalFailureReason: input.finalFailureReason ?? null,
   };
 }
 
@@ -266,54 +266,6 @@ function structuredError(code: AdvisorErrorCode, status: number, diagnosticMessa
     },
     { status },
   );
-}
-
-function classifyProviderError(error: unknown) {
-  let status = 0;
-  if (error instanceof ApiError) {
-    status = error.status;
-  } else if (typeof error === "object" && error !== null && "status" in error) {
-    const possibleStatus = (error as { status?: unknown }).status;
-    status = typeof possibleStatus === "number" ? possibleStatus : 0;
-  }
-
-  const message = error instanceof Error ? error.message : String(error);
-  const normalized = message.toLowerCase();
-
-  if (normalized.includes("timeout") || normalized.includes("timed out") || normalized.includes("abort")) {
-    return { code: "timeout" as const, status: 504, message: "Gemini request timed out.", retryable: true };
-  }
-  if (status === 429 || normalized.includes("quota") || normalized.includes("resource_exhausted")) {
-    return { code: "quota" as const, status: 503, message: "Gemini quota or rate limit was reached.", retryable: true };
-  }
-  if (status === 401 || status === 403 || normalized.includes("api key") || normalized.includes("permission_denied")) {
-    return { code: "invalid_key" as const, status: 503, message: "Gemini rejected the configured API key.", retryable: false };
-  }
-  if (status === 404 || (normalized.includes("model") && normalized.includes("not found"))) {
-    return { code: "model_error" as const, status: 503, message: `Gemini model ${ADVISOR_GEMINI_MODEL} is unavailable.`, retryable: false };
-  }
-  if (status >= 500 || error instanceof ApiError) {
-    return { code: "provider_error" as const, status: 503, message: `Gemini API error${status ? ` (${status})` : ""}.`, retryable: true };
-  }
-  return { code: "backend_error" as const, status: 500, message: "Unexpected Advisor backend error.", retryable: true };
-}
-
-async function generateAdvisorReply(ai: GoogleGenAI, prompt: string, actionType: AdvisorActionType, retry = false) {
-  const response = await ai.models.generateContent({
-    model: ADVISOR_GEMINI_MODEL,
-    contents: retry
-      ? `${prompt}\n\nThe previous draft was empty, incomplete, or under ${MIN_ADVISOR_WORDS} words. Regenerate the complete answer now. Use the required headings, finish every sentence, and return 140-240 words.`
-      : prompt,
-    config: {
-      temperature: 0.25,
-      maxOutputTokens: actionType === "chat" ? 1_400 : 1_900,
-      systemInstruction,
-      thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
-      httpOptions: { timeout: ADVISOR_TIMEOUT_MS },
-    },
-  });
-
-  return response.text?.trim() ?? "";
 }
 
 function usageAllows(row: UsageRow | null, planName: PaidPlanName, actionType: AdvisorActionType) {
@@ -477,12 +429,15 @@ export async function POST(request: Request) {
 
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     const prompt = buildAdvisorPrompt(message, body.currentReportData, sanitizeHistory(body.chatHistory), body.companyProfile, body.competitorData, actionType);
-    const firstReply = await generateAdvisorReply(ai, prompt, actionType);
-    const shouldRetry = !firstReply || wordCount(firstReply) < MIN_ADVISOR_WORDS;
-    const retryReply = shouldRetry ? await generateAdvisorReply(ai, prompt, actionType, true) : "";
-    const generatedReply = shouldRetry ? retryReply : firstReply;
-    const usedFallback = !generatedReply || wordCount(generatedReply) < MIN_ADVISOR_WORDS;
-    const reply = sanitizeForbiddenClaims(usedFallback ? structuredFallback(body.currentReportData) : generatedReply);
+    const generation = await generateAdvisorWithResilience({
+      ai,
+      prompt,
+      actionType,
+      systemInstruction,
+      minWords: MIN_ADVISOR_WORDS,
+      structuredFallback: () => structuredFallback(body.currentReportData),
+    });
+    const reply = sanitizeForbiddenClaims(generation.reply);
 
     const updatedUsage = requestedPlan === "betaFullReport" || isAdminQa ? null : await incrementUsage(usageRow, actionType);
     const usagePlan = planLimits[planName];
@@ -496,27 +451,44 @@ export async function POST(request: Request) {
       ? diagnosticState({
           accessState: "admin",
           reportContext: "found",
-          lastError: usedFallback ? "empty_response" : null,
-          responseLength: reply.length,
-          retried: shouldRetry,
+          lastError: generation.finalFailure?.code ?? null,
+          providerStatus: generation.finalFailure?.status ?? null,
+          retryCount: generation.retryCount,
+          responseLength: generation.responseLength,
+          modelUsed: generation.modelUsed,
+          finalFailureReason: generation.finalFailure?.message ?? null,
         })
       : undefined;
 
     return NextResponse.json({
       reply,
-      model: ADVISOR_GEMINI_MODEL,
+      model: generation.modelUsed,
       usage,
       limits: usagePlan,
       resetDate,
       ...(diagnostics ? { diagnostics } : {}),
     });
   } catch (error) {
-    const classified = classifyProviderError(error);
-    console.error("AI Advisor chat failed", {
-      code: classified.code,
+    if (error instanceof AdvisorGenerationError) {
+      const diagnostics = adminDiagnostics
+        ? diagnosticState({
+            ...adminDiagnostics,
+            status: "error",
+            lastError: error.failure.code,
+            providerStatus: error.failure.status,
+            retryCount: error.retryCount,
+            responseLength: error.responseLength,
+            modelUsed: error.modelUsed,
+            finalFailureReason: error.failure.message,
+          })
+        : undefined;
+      return structuredError(error.failure.code, error.failure.status, error.failure.message, error.failure.retryable, diagnostics);
+    }
+
+    console.error("AI Advisor route failed", {
       model: ADVISOR_GEMINI_MODEL,
-      status: classified.status,
+      finalStatus: "backend_error",
     });
-    return structuredError(classified.code, classified.status, classified.message, classified.retryable, adminDiagnostics);
+    return structuredError("backend_error", 500, "Unexpected Advisor backend error.", true, adminDiagnostics);
   }
 }

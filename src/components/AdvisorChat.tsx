@@ -15,7 +15,7 @@ const quickActions: Array<{ label: string; prompt: string; actionType: AdvisorAc
 ];
 
 const maxMessageLength = 900;
-const normalUserErrorCopy = "AI Visibility Advisor is being tuned for beta. Your report and recommended fixes are available now.";
+const normalUserErrorCopy = "AI Visibility Advisor is temporarily busy. Your report and recommended fixes are still available.";
 
 type AdvisorMessage = {
   id: string;
@@ -42,9 +42,11 @@ type AdvisorDiagnostics = {
   reportContext: "found" | "missing";
   accessState: "admin" | "paid" | "free";
   lastError: string | null;
+  providerStatus: number | null;
+  retryCount: number;
   responseLength: number;
   modelUsed: string;
-  retried: boolean;
+  finalFailureReason: string | null;
 };
 
 type AdvisorApiResponse = {
@@ -133,9 +135,11 @@ function DiagnosticsPanel({ diagnostics, diagnosticMessage, hasData }: { diagnos
           ["Report context", hasData ? "found" : "missing"],
           ["Access state", diagnostics?.accessState || "admin"],
           ["Last error", diagnostics?.lastError || "none"],
+          ["Provider status", diagnostics?.providerStatus ? String(diagnostics.providerStatus) : "none"],
+          ["Retry count", String(diagnostics?.retryCount ?? 0)],
           ["Response length", String(diagnostics?.responseLength ?? 0)],
           ["Model used", diagnostics?.modelUsed || "checking"],
-          ["Short-answer retry", diagnostics?.retried ? "used" : "not used"],
+          ["Final failure", diagnostics?.finalFailureReason || "none"],
         ].map(([label, value]) => (
           <div key={label} className="flex items-center justify-between gap-3 rounded-xl border border-cyan-100 bg-white px-3 py-2">
             <span className="text-slate-500">{label}</span>
@@ -199,9 +203,11 @@ export function AdvisorChat({ currentReportData, companyProfile, competitorData,
             reportContext: hasData ? "found" : "missing",
             accessState: "admin",
             lastError: "backend_error",
+            providerStatus: null,
+            retryCount: 0,
             responseLength: 0,
             modelUsed: "unavailable",
-            retried: false,
+            finalFailureReason: "Diagnostics endpoint could not be reached.",
           });
         }
       });
@@ -353,7 +359,7 @@ export function AdvisorChat({ currentReportData, companyProfile, competitorData,
             <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">{message.content}</div>
           </div>
         ))}
-        {isLoading ? <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm font-semibold text-slate-600">AI Advisor is thinking…</div> : null}
+        {isLoading ? <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm font-semibold text-slate-600">AI Advisor is thinking...</div> : null}
       </div>
 
       {error ? <p className="mt-4 rounded-2xl border border-rose-100 bg-rose-50 p-3 text-sm font-semibold text-rose-700">{error}</p> : null}
@@ -375,7 +381,7 @@ export function AdvisorChat({ currentReportData, companyProfile, competitorData,
             className="min-h-12 flex-1 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-700 outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100 disabled:bg-slate-100 disabled:text-slate-500"
           />
           <button type="submit" disabled={isLoading || input.trim().length === 0 || usage.creditsUsed >= limits.advisorCredits} className="min-h-12 rounded-2xl bg-slate-950 px-5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300">
-            {isLoading ? "Thinking…" : "Send"}
+            {isLoading ? "Thinking..." : "Send"}
           </button>
         </div>
         <p className={`text-xs font-semibold ${remainingCharacters < 80 ? "text-amber-700" : "text-slate-500"}`}>{remainingCharacters} characters remaining</p>

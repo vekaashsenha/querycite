@@ -24,6 +24,7 @@ Optional model overrides:
 ```bash
 GEMINI_MODEL=gemini-3.5-flash
 GEMINI_ADVISOR_MODEL=gemini-3.5-flash
+GEMINI_ADVISOR_FALLBACK_MODEL=gemini-3.1-flash-lite
 ```
 
 Do not commit `.env.local`.
