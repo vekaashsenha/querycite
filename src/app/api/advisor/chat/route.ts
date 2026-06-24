@@ -14,10 +14,10 @@ const ADVISOR_GEMINI_MODEL = getGeminiModelSequence("advisor")[0];
 const MAX_MESSAGE_LENGTH = 900;
 const MAX_HISTORY_ITEMS = 8;
 const MIN_ADVISOR_WORDS = 80;
-const offTopicReply = "I can only help with this AI Visibility Report, AEO/GEO fixes, competitor gaps, content improvements, developer notes, and next steps.";
+const offTopicReply = "I can help with AI visibility, AEO/GEO, website readiness, content, schema, crawler access, and report action planning. Please ask me something in that area.";
 const normalUserErrorCopy = "AI Visibility Advisor is temporarily busy. Your report and recommended fixes are still available.";
 
-const systemInstruction = `You are QueryCite AI Visibility Advisor. You help users understand and act on their current AI Visibility Audit report. Only answer using the current report data, saved company profile context, saved competitor data, and related AEO/GEO best practices. Do not answer unrelated questions. Do not guarantee AI citations, rankings, traffic, revenue, or search positions. Give practical next steps for marketing, content, and developer teams. Refuse black-hat SEO, spam tactics, scraping bypasses, competitor defamation, and medical, legal, or financial advice.`;
+const systemInstruction = `You are QueryCite AI Visibility Advisor, a dependable implementation buddy for founders, small business owners, freelancer marketers, and non-technical growth teams. Answer flexible questions about AI visibility, AEO, GEO, AI search platforms, SEO basics connected to AI visibility, content, entity clarity, schema, llms.txt, robots.txt, canonical tags, sitemaps, crawlability, competitors, and implementation. Use current report data where available, then relevant best practices, and clearly state when data is missing. Generate actual copy-paste fixes and beginner-friendly steps whenever possible. Do not guarantee AI citations, rankings, traffic, revenue, or inclusion in any platform. Refuse black-hat SEO, spam tactics, scraping bypasses, competitor defamation, and medical, legal, or financial advice.`;
 
 type ChatMessage = {
   role: "user" | "assistant";
@@ -107,26 +107,23 @@ function isReportDataPresent(value: unknown) {
 
 function isBlockedOrUnrelated(message: string) {
   const normalized = message.toLowerCase();
-  const blockedPatterns = [
-    /\b(guarantee|guaranteed)\b.*\b(chatgpt|ai|citation|ranking|traffic|revenue|position)\b/,
+  const unsafePatterns = [
     /\b(medical advice|legal advice|financial advice|diagnose|lawsuit|investment advice)\b/,
     /\b(black hat|black-hat|spam backlinks|keyword stuffing|cloaking|parasite seo|negative seo)\b/,
     /\b(defame|smear|fake review|scrape private|bypass robots|bypass paywall)\b/,
   ];
-  const unrelatedPatterns = [
-    /\b(recipe|cook|movie|song|poem|joke|weather|sports|stock|crypto|dating|travel itinerary)\b/,
-    /\b(write code|debug my code|math homework|translate this)\b/,
-    /\bwho is|what is the capital|current news\b/,
+  const relevantPatterns = [
+    /\b(ai visibility|ai search|aeo|geo|citation|cite|answer engine|search engine|seo|rank|ranking|traffic)\b/,
+    /\b(chatgpt|gemini|perplexity|ai overview|bing copilot|claude|copilot)\b/,
+    /\b(schema|structured data|llms|robots|canonical|sitemap|crawl|crawler|metadata|internal link)\b/,
+    /\b(content|blog|faq|entity|brand clarity|competitor|developer|website|report|fix|action plan)\b/,
   ];
-  const reportPatterns = [
-    /\b(ai visibility|visibility|score|report|aeo|geo|citation|cite|competitor|content|schema|metadata|developer|internal link|faq|fix|action plan|pdf|csv|share|email|next step|ranking|traffic|search|crawler|llms)\b/,
-    /\bwhat should i|where should i|why is|how do i improve|7-day|30-day\b/,
-  ];
+  const clearlyUnrelated = /\b(recipe|cook|movie|song|poem|joke|weather|sports|stock|crypto|dating|travel itinerary|math homework|translate this)\b/;
 
-  if (blockedPatterns.some((pattern) => pattern.test(normalized))) return true;
-  return unrelatedPatterns.some((pattern) => pattern.test(normalized)) && !reportPatterns.some((pattern) => pattern.test(normalized));
+  if (unsafePatterns.some((pattern) => pattern.test(normalized))) return true;
+  if (relevantPatterns.some((pattern) => pattern.test(normalized))) return false;
+  return clearlyUnrelated.test(normalized);
 }
-
 function sanitizeForbiddenClaims(reply: string) {
   return reply
     .replace(/guaranteed\s+AI\s+ranking/gi, "improved AI visibility readiness")
@@ -357,7 +354,10 @@ export async function POST(request: Request) {
       minWords: MIN_ADVISOR_WORDS,
       requiredSections: promptContext.requiredSections,
       groundingGroups: promptContext.reportContext.groundingGroups,
-      structuredFallback: () => buildStructuredAdvisorFallback(message, actionType, promptContext.reportContext),
+      minimumGroundingGroups: promptContext.minimumGroundingGroups,
+      requiredContentGroups: promptContext.requiredContentGroups,
+      answerMode: promptContext.mode,
+      structuredFallback: () => buildStructuredAdvisorFallback(message, actionType, promptContext.reportContext, promptContext.intent),
     });
     const reply = sanitizeForbiddenClaims(generation.reply);
 

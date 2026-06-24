@@ -96,6 +96,8 @@ function responseCompleteness(input: {
   minWords: number;
   requiredSections: string[];
   groundingGroups: string[][];
+  minimumGroundingGroups: number;
+  requiredContentGroups: string[][];
 }) {
   const reasons: string[] = [];
   const normalizedReply = normalizeForMatch(input.attempt.reply);
@@ -109,11 +111,14 @@ function responseCompleteness(input: {
   const missingSections = input.requiredSections.filter((section) => !normalizedReply.includes(normalizeForMatch(section)));
   if (missingSections.length) reasons.push(`missing sections: ${missingSections.join(", ")}`);
 
+  const missingContentGroups = input.requiredContentGroups.filter((group) => !group.some((term) => normalizedReply.includes(normalizeForMatch(term))));
+  if (missingContentGroups.length) reasons.push(`missing required deliverables: ${missingContentGroups.map((group) => group.join(" or ")).join(", ")}`);
+
   const normalizedGroundingGroups = input.groundingGroups
     .map((group) => [...new Set(group.map(normalizeForMatch).filter((term) => term.length >= 3))])
     .filter((group) => group.length > 0);
   const groundingMatches = normalizedGroundingGroups.filter((group) => group.some((term) => normalizedReply.includes(term))).length;
-  const requiredGroundingMatches = normalizedGroundingGroups.length;
+  const requiredGroundingMatches = Math.min(input.minimumGroundingGroups, normalizedGroundingGroups.length);
   if (groundingMatches < requiredGroundingMatches) {
     reasons.push(`incomplete report grounding (${groundingMatches}/${requiredGroundingMatches} signal groups)`);
   }
@@ -175,13 +180,14 @@ async function generateAttempt(input: {
   actionType: AdvisorActionType;
   model: string;
   systemInstruction: string;
+  answerMode: "concise" | "detailed" | "full_solution";
 }) {
   const operation = input.ai.models.generateContent({
     model: input.model,
     contents: input.prompt,
     config: {
       temperature: 0.2,
-      maxOutputTokens: input.actionType === "chat" ? 3_200 : 5_000,
+      maxOutputTokens: input.answerMode === "full_solution" ? 7_000 : input.answerMode === "detailed" ? 5_000 : 3_200,
       systemInstruction: input.systemInstruction,
       thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
       httpOptions: { timeout: ADVISOR_TIMEOUT_MS },
@@ -206,6 +212,9 @@ export async function generateAdvisorWithResilience(input: {
   minWords: number;
   requiredSections: string[];
   groundingGroups: string[][];
+  minimumGroundingGroups: number;
+  requiredContentGroups: string[][];
+  answerMode: "concise" | "detailed" | "full_solution";
   structuredFallback: () => string;
 }): Promise<AdvisorGenerationResult> {
   let lastFailure: AdvisorProviderFailure | null = null;
@@ -230,6 +239,8 @@ export async function generateAdvisorWithResilience(input: {
         minWords: input.minWords,
         requiredSections: input.requiredSections,
         groundingGroups: input.groundingGroups,
+        minimumGroundingGroups: input.minimumGroundingGroups,
+        requiredContentGroups: input.requiredContentGroups,
       });
 
       if (completeness.complete) {
@@ -302,6 +313,29 @@ export async function generateAdvisorWithResilience(input: {
     message: "Unexpected Advisor backend error.",
     retryable: true,
   };
+
+  if (failure.retryable || failure.code === "model_error") {
+    const fallback = input.structuredFallback();
+    console.warn("AI Advisor generation", {
+      model: lastModel,
+      responseLength: lastResponseLength,
+      retriesAttempted: retryCount,
+      finishReason: lastFinishReason,
+      responseComplete: false,
+      finalStatus: "provider_fallback",
+      failureCode: failure.code,
+    });
+    return {
+      reply: fallback,
+      modelUsed: lastModel,
+      retryCount,
+      responseLength: fallback.length,
+      responseComplete: true,
+      finishReason: lastFinishReason,
+      usedStructuredFallback: true,
+      finalFailure: failure,
+    };
+  }
   console.error("AI Advisor generation", {
     model: lastModel,
     responseLength: lastResponseLength,

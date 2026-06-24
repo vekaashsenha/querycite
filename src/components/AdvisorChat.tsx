@@ -5,13 +5,14 @@ import { StatusPill } from "@/components/ui";
 import { advisorActionCosts, planLimits, type AdvisorActionType, type PaidPlanName } from "@/lib/plans";
 
 const quickActions: Array<{ label: string; prompt: string; actionType: AdvisorActionType }> = [
-  { label: "Explain my score", prompt: "Explain my AI Visibility Score and what is helping or hurting it.", actionType: "chat" },
-  { label: "What should I fix first?", prompt: "What should I fix first based on effort and impact?", actionType: "chat" },
-  { label: "Generate AEO/GEO fix plan", prompt: "Generate a practical AEO/GEO fix plan from this report.", actionType: "fix_pack" },
-  { label: "Generate blog ideas", prompt: "Generate five blog ideas from the gaps in this report.", actionType: "blog_brief" },
-  { label: "Create developer notes", prompt: "Create developer action notes from this report.", actionType: "fix_pack" },
-  { label: "Compare competitors", prompt: "Compare my site with saved competitors and identify the strongest gaps.", actionType: "competitor_advice" },
-  { label: "Create 30-day plan", prompt: "Create a 30-day AI visibility readiness action plan.", actionType: "chat" },
+  { label: "What should I fix first?", prompt: "What should I fix first based on this report?", actionType: "chat" },
+  { label: "Platform strategy", prompt: "What all platforms should I target to rank?", actionType: "chat" },
+  { label: "Create llms.txt", prompt: "Create llms.txt for me.", actionType: "fix_pack" },
+  { label: "Write website schema", prompt: "Write schema for my website.", actionType: "fix_pack" },
+  { label: "Generate blog ideas", prompt: "Generate blog ideas based on this report.", actionType: "blog_brief" },
+  { label: "Developer fix plan", prompt: "What should my developer fix first?", actionType: "fix_pack" },
+  { label: "Content team plan", prompt: "What should my content team do first?", actionType: "fix_pack" },
+  { label: "Copy-paste fixes", prompt: "Give me copy-paste fixes.", actionType: "fix_pack" },
 ];
 
 const maxMessageLength = 900;
@@ -160,7 +161,7 @@ export function AdvisorChat({ currentReportData, companyProfile, competitorData,
   const [messages, setMessages] = useState<AdvisorMessage[]>([
     createMessage(
       "assistant",
-      "Ask about your score, highest-priority fixes, content gaps, competitor readiness, or developer actions. I will stay grounded in this report.",
+      "Ask about AI platforms, content, schema, llms.txt, developer fixes, or what to do next. I will use this report and give you practical implementation steps.",
     ),
   ]);
   const [input, setInput] = useState("");
@@ -324,7 +325,7 @@ export function AdvisorChat({ currentReportData, companyProfile, competitorData,
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="text-2xl font-semibold text-slate-950">AI Visibility Advisor</h3>
-          <p className="mt-2 text-sm leading-6 text-slate-600">Turn this audit into prioritized content, technical, and AEO/GEO actions.</p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">Turn this audit into copy-paste fixes, beginner-friendly steps, content briefs, and platform priorities.</p>
         </div>
         <StatusPill tone={isAdminQa ? "cyan" : "violet"}>{isAdminQa ? "QA" : planType === "betaFullReport" ? "Beta preview" : "Paid access"}</StatusPill>
       </div>
@@ -383,7 +384,7 @@ export function AdvisorChat({ currentReportData, companyProfile, competitorData,
               setInput(event.target.value);
               if (error) setError("");
             }}
-            placeholder="Ask about AEO/GEO fixes, competitor gaps, or next steps"
+            placeholder="Ask about AI platforms, schema, llms.txt, content, or developer fixes"
             className="min-h-12 flex-1 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-700 outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100 disabled:bg-slate-100 disabled:text-slate-500"
           />
           <button type="submit" disabled={isLoading || input.trim().length === 0 || usage.creditsUsed >= limits.advisorCredits} className="min-h-12 rounded-2xl bg-slate-950 px-5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300">
