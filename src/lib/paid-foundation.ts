@@ -89,6 +89,10 @@ function isCurrentPeriodActive(end: string | null | undefined) {
   return Boolean(end && Date.parse(end) > Date.now());
 }
 
+function hasAccessStarted(start: string | null | undefined) {
+  return !start || Date.parse(start) <= Date.now();
+}
+
 function isOneTimeBetaRow(row: SubscriptionRow | undefined) {
   return row?.payment_type === "one_time_beta";
 }
@@ -102,7 +106,7 @@ function rowAllowsPaidAccess(row: SubscriptionRow | undefined) {
   const end = betaAccessEnd(row);
 
   if (isOneTimeBetaRow(row) || row.coupon_code) {
-    return row.paid_access === true && row.status === "active" && isCurrentPeriodActive(end);
+    return row.paid_access === true && row.status === "active" && hasAccessStarted(row.access_starts_at ?? row.current_period_start) && isCurrentPeriodActive(end);
   }
 
   if (row.paid_access === true && end) return isCurrentPeriodActive(end);
@@ -203,17 +207,18 @@ export async function getPaidAccessContextForUser(user: QueryCiteUser | null): P
   const admin = await isAdminUser(user);
   if (!isSupabaseAdminConfigured()) {
     const empty = emptyContext(null, user);
-    return admin ? { ...empty, isAdmin: true, qaAccess: true, planName: "adminQa", rawPlanName: "Admin QA access", status: "admin_qa", limits: planLimits.adminQa } : empty;
+    return admin ? { ...empty, isAdmin: true, qaAccess: true, planName: "adminQa", rawPlanName: "Admin", status: "admin", limits: planLimits.adminQa } : empty;
   }
 
   const rows = await selectSupabaseRows<SubscriptionRow>("subscriptions", {
     select: subscriptionSelect,
     or: `(user_id.eq.${user.id},email.eq.${user.email})`,
     order: "updated_at.desc",
-    limit: "1",
+    limit: "20",
   });
 
-  const context = contextFromRow(rows[0], rows[0]?.razorpay_subscription_id || rows[0]?.provider_subscription_id || rows[0]?.razorpay_order_id || null, user);
+  const selectedRow = rows.find(rowAllowsPaidAccess) ?? rows[0];
+  const context = contextFromRow(selectedRow, selectedRow?.razorpay_subscription_id || selectedRow?.provider_subscription_id || selectedRow?.razorpay_order_id || null, user);
   if (!admin) return context;
 
   return {
@@ -221,8 +226,8 @@ export async function getPaidAccessContextForUser(user: QueryCiteUser | null): P
     isAdmin: true,
     qaAccess: true,
     planName: context.verifiedPaidAccess ? context.planName : "adminQa",
-    rawPlanName: context.verifiedPaidAccess ? context.rawPlanName : "Admin QA access",
-    status: context.verifiedPaidAccess ? context.status : "admin_qa",
+    rawPlanName: context.verifiedPaidAccess ? context.rawPlanName : "Admin",
+    status: context.verifiedPaidAccess ? context.status : "admin",
     limits: context.verifiedPaidAccess ? context.limits : planLimits.adminQa,
   };
 }
@@ -360,6 +365,33 @@ export async function getPaymentHistoryForUser(user: QueryCiteUser): Promise<Pay
   });
 
   return rows.map(mapPayment);
+}
+
+export async function getPaymentForUserById(user: QueryCiteUser, paymentId: string): Promise<PaymentHistoryItem | null> {
+  if (!paymentId || !isSupabaseAdminConfigured()) return null;
+
+  const rows = await selectSupabaseRows<PaymentRow>("payments", {
+    select: paymentSelect,
+    id: `eq.${paymentId}`,
+    or: `(user_id.eq.${user.id},email.eq.${user.email})`,
+    limit: "1",
+  });
+
+  return rows[0] ? mapPayment(rows[0]) : null;
+}
+
+export function isPaidPaymentRecord(payment: PaymentHistoryItem) {
+  return ["captured", "paid", "active", "paid_beta_active"].includes(payment.status.toLowerCase());
+}
+
+export function receiptNumberForPayment(payment: PaymentHistoryItem) {
+  const date = new Date(payment.createdAt);
+  const datePart = Number.isNaN(date.getTime())
+    ? "00000000"
+    : `${date.getUTCFullYear()}${String(date.getUTCMonth() + 1).padStart(2, "0")}${String(date.getUTCDate()).padStart(2, "0")}`;
+  const source = payment.razorpayPaymentId || payment.razorpayOrderId || payment.id;
+  const suffix = source.replace(/[^a-zA-Z0-9]/g, "").slice(-6).toUpperCase().padStart(6, "0");
+  return `QC-${datePart}-${suffix}`;
 }
 
 export function formatPaise(amount: number | null, currency = "INR") {

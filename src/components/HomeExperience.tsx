@@ -116,7 +116,7 @@ function LeadCaptureModal({ report, onSuccess }: { report: WebsiteAuditReport; o
     }
 
     if (!isValidEmail(trimmedEmail)) {
-      setError("Please enter a valid work email.");
+      setError("Please enter a valid email.");
       return;
     }
 
@@ -178,7 +178,7 @@ function LeadCaptureModal({ report, onSuccess }: { report: WebsiteAuditReport; o
               <input value={fullName} onChange={(event) => setFullName(event.target.value)} className="min-h-12 rounded-2xl border border-slate-200 px-4 text-sm outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100" />
             </label>
             <label className="grid gap-2 text-sm font-semibold text-slate-700">
-              Work email
+              Email
               <input value={email} onChange={(event) => setEmail(event.target.value)} inputMode="email" className="min-h-12 rounded-2xl border border-slate-200 px-4 text-sm outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100" />
             </label>
             <label className="grid gap-2 text-sm font-semibold text-slate-700">

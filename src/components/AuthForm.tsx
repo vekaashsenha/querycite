@@ -31,7 +31,7 @@ function AuthShell({ mode, children }: { mode: AuthMode; children: React.ReactNo
           </h1>
           <p className="mt-5 max-w-xl text-base leading-7 text-slate-600">
             {isSignup
-              ? "Save report history, prepare competitor context, and keep full-report workflows connected to your work email."
+              ? "Save report history, prepare competitor context, and keep full-report workflows connected to your email."
               : "Access saved reports, profile settings, billing status, and full-report workflows when your access is verified."}
           </p>
           <div className="mt-7 grid gap-3 text-sm font-semibold text-slate-700 sm:grid-cols-2">
@@ -102,7 +102,7 @@ function AuthFormInner({ mode }: { mode: AuthMode }) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-2xl font-semibold text-slate-950">{isSignup ? "Sign up" : "Welcome back"}</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-600">Use your work email and password.</p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">Use your email and password.</p>
         </div>
         <StatusPill tone={isSignup ? "green" : "slate"}>{isSignup ? "Private beta" : "Secure login"}</StatusPill>
       </div>
@@ -115,7 +115,7 @@ function AuthFormInner({ mode }: { mode: AuthMode }) {
           </label>
         ) : null}
         <label className="grid gap-2 text-sm font-semibold text-slate-700">
-          Work email
+          Email
           <input value={email} onChange={(event) => setEmail(event.target.value)} type="email" autoComplete="email" className={inputClass} />
         </label>
         <label className="grid gap-2 text-sm font-semibold text-slate-700">

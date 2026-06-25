@@ -729,7 +729,7 @@ export function ReportExperience({ isFullDemo, reportId, subscriptionId, hasVeri
         <div className="mb-8 overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.10)]">
           <div className="grid gap-0 lg:grid-cols-[0.9fr_1.1fr]">
             <div className="bg-slate-950 p-6 text-white sm:p-8">
-              <StatusPill tone={hasFullAccess ? "violet" : "green"}>{isAdminPreview ? "QA" : isFullDemo ? "Beta full report" : hasFullAccess ? "Full report" : "Free report"}</StatusPill>
+              <StatusPill tone={hasFullAccess ? "violet" : "green"}>{isAdminPreview ? "Admin" : isFullDemo ? "Beta full report" : hasFullAccess ? "Full report" : "Free report"}</StatusPill>
               <h1 className="mt-5 text-4xl font-semibold leading-tight sm:text-5xl">AI Visibility Audit Report</h1>
               <p className="mt-4 break-all text-sm font-semibold leading-6 text-slate-300">Website URL: {report.finalUrl}</p>
               <p className="mt-1 text-sm text-slate-400">Scanned: {new Date(report.scannedAt).toLocaleString()}</p>

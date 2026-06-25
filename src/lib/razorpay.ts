@@ -74,7 +74,7 @@ function getRequiredEnv(name: string) {
 export function getRazorpayPublicKeyId() {
   const keyId = getRequiredEnv("NEXT_PUBLIC_RAZORPAY_KEY_ID");
   if (!keyId.startsWith("rzp_test_")) {
-    throw new Error("Razorpay Test Mode key is required for QueryCite payment testing.");
+    throw new Error("Razorpay payment configuration is required.");
   }
   return keyId;
 }

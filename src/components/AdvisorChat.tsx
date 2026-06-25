@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { AdvisorMarkdown } from "@/components/AdvisorMarkdown";
 import { StatusPill } from "@/components/ui";
 import { advisorActionCosts, planLimits, type AdvisorActionType, type PaidPlanName } from "@/lib/plans";
 
@@ -56,6 +57,7 @@ type AdvisorApiResponse = {
   reply?: string;
   error?: string | AdvisorError;
   usage?: UsageState;
+  resetDate?: string | null;
   diagnostics?: AdvisorDiagnostics;
   diagnosticMessage?: string;
 };
@@ -170,6 +172,7 @@ export function AdvisorChat({ currentReportData, companyProfile, competitorData,
   const [error, setError] = useState("");
   const [diagnostics, setDiagnostics] = useState<AdvisorDiagnostics | null>(null);
   const [diagnosticMessage, setDiagnosticMessage] = useState("");
+  const [effectiveResetDate, setEffectiveResetDate] = useState(resetDate ?? null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const limits = planLimits[planType] || planLimits.free;
   const isFree = planType === "free";
@@ -190,13 +193,16 @@ export function AdvisorChat({ currentReportData, companyProfile, competitorData,
   }, [messages, isLoading]);
 
   useEffect(() => {
-    if (!isAdminQa) return;
+    if (isFree || planType === "betaFullReport") return;
 
     let active = true;
     fetch("/api/advisor/chat", { method: "GET" })
       .then(async (response) => {
-        const data = (await response.json()) as { diagnostics?: AdvisorDiagnostics };
-        if (active && response.ok && data.diagnostics) {
+        const data = (await response.json()) as AdvisorApiResponse;
+        if (!active || !response.ok) return;
+        if (data.usage) setUsage(data.usage);
+        if (data.resetDate) setEffectiveResetDate(data.resetDate);
+        if (data.diagnostics) {
           setDiagnostics({ ...data.diagnostics, reportContext: hasData ? "found" : "missing" });
         }
       })
@@ -222,7 +228,7 @@ export function AdvisorChat({ currentReportData, companyProfile, competitorData,
     return () => {
       active = false;
     };
-  }, [hasData, isAdminQa]);
+  }, [hasData, isAdminQa, isFree, planType]);
 
   if (!hasData) {
     return (
@@ -266,7 +272,7 @@ export function AdvisorChat({ currentReportData, companyProfile, competitorData,
     }
 
     if (wouldExceedLimit(usage, planType, actionType)) {
-      setError("You have used all Advisor credits for this billing period.");
+      setError(`You have used this period's limit for this feature. Your paid access remains active until ${formatDate(effectiveResetDate)}.`);
       return;
     }
 
@@ -304,12 +310,13 @@ export function AdvisorChat({ currentReportData, companyProfile, competitorData,
 
       setMessages((current) => [...current, createMessage("assistant", data.reply || normalUserErrorCopy)]);
       setUsage((current) => data.usage ?? nextLocalUsage(current, actionType));
+      if (data.resetDate) setEffectiveResetDate(data.resetDate);
       if (data.diagnostics) setDiagnostics(data.diagnostics);
       if (data.diagnosticMessage) setDiagnosticMessage(data.diagnosticMessage);
     } catch (advisorError) {
       const message = isAdminQa && advisorError instanceof Error ? advisorError.message : normalUserErrorCopy;
       setError(message);
-      setMessages((current) => [...current, createMessage("assistant", isAdminQa ? `Admin diagnostic: ${message}` : normalUserErrorCopy)]);
+      setMessages((current) => [...current, createMessage("assistant", normalUserErrorCopy)]);
     } finally {
       setIsLoading(false);
     }
@@ -327,20 +334,24 @@ export function AdvisorChat({ currentReportData, companyProfile, competitorData,
           <h3 className="text-2xl font-semibold text-slate-950">AI Visibility Advisor</h3>
           <p className="mt-2 text-sm leading-6 text-slate-600">Turn this audit into copy-paste fixes, beginner-friendly steps, content briefs, and platform priorities.</p>
         </div>
-        <StatusPill tone={isAdminQa ? "cyan" : "violet"}>{isAdminQa ? "QA" : planType === "betaFullReport" ? "Beta preview" : "Paid access"}</StatusPill>
+        <StatusPill tone={isAdminQa ? "cyan" : "violet"}>{isAdminQa ? "Admin" : planType === "betaFullReport" ? "Beta preview" : "Paid access"}</StatusPill>
       </div>
 
       {isAdminQa ? <DiagnosticsPanel diagnostics={diagnostics} diagnosticMessage={diagnosticMessage} hasData={hasData} /> : null}
 
-      <div className="mt-5 grid gap-3 md:grid-cols-4">
-        <UsageMeter label="Advisor credits" used={usage.creditsUsed} total={limits.advisorCredits} />
-        <UsageMeter label="Blog briefs" used={usage.blogBriefsUsed} total={limits.blogBriefs} />
-        <UsageMeter label="Fix packs" used={usage.fixPacksUsed} total={limits.fixPacks} />
-        <div className="rounded-2xl border border-violet-100 bg-white p-3 text-xs font-semibold leading-5 text-slate-600">
-          <p>Resets on</p>
-          <p className="mt-1 text-sm text-slate-950">{isAdminQa ? "QA limits relaxed" : formatDate(resetDate)}</p>
+      {isAdminQa ? (
+        <p className="mt-5 inline-flex rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1.5 text-xs font-semibold text-cyan-900">Admin access</p>
+      ) : (
+        <div className="mt-5 grid gap-3 md:grid-cols-4">
+          <UsageMeter label="Advisor credits" used={usage.creditsUsed} total={limits.advisorCredits} />
+          <UsageMeter label="Blog briefs" used={usage.blogBriefsUsed} total={limits.blogBriefs} />
+          <UsageMeter label="Fix packs" used={usage.fixPacksUsed} total={limits.fixPacks} />
+          <div className="rounded-2xl border border-violet-100 bg-white p-3 text-xs font-semibold leading-5 text-slate-600">
+            <p>Renews on</p>
+            <p className="mt-1 text-sm text-slate-950">{formatDate(effectiveResetDate)}</p>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="mt-5 rounded-2xl border border-violet-100 bg-white p-4">
         <p className="text-sm font-semibold text-slate-950">Quick actions</p>
@@ -363,7 +374,9 @@ export function AdvisorChat({ currentReportData, companyProfile, competitorData,
         {messages.map((message) => (
           <div key={message.id} className={`rounded-2xl border p-4 ${message.role === "assistant" ? "border-slate-200 bg-white" : "border-violet-100 bg-violet-100/70"}`}>
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{message.role === "assistant" ? "Advisor" : "You"}</p>
-            <div className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">{message.content}</div>
+            <div className="mt-2 min-w-0 max-w-full">
+              {message.role === "assistant" ? <AdvisorMarkdown content={message.content} /> : <div className="whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">{message.content}</div>}
+            </div>
           </div>
         ))}
         {isLoading ? <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm font-semibold text-slate-600">AI Advisor is thinking...</div> : null}

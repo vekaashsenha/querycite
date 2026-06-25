@@ -54,7 +54,7 @@ export function ContactForm() {
     <form onSubmit={handleSubmit} className="grid gap-4 rounded-3xl border border-white/70 bg-white/85 p-6 shadow-lg">
       {[
         ["Name", "name", "text", true],
-        ["Work email", "email", "email", true],
+        ["Email", "email", "email", true],
         ["Company", "company", "text", true],
         ["Website URL", "website_url", "text", false],
       ].map(([label, name, type, required]) => (

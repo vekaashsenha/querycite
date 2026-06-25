@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AppearanceSettings } from "@/components/AppearanceSettings";
 import { DashboardShell, WorkspaceHeader } from "@/components/DashboardShell";
 import { ProfileSettings } from "@/components/ProfileSettings";
 import { AppCard, EmptyState, LockedPanel, PrimaryLink, StatusPill } from "@/components/ui";
@@ -33,6 +34,10 @@ export default async function ProfilePage() {
           <LockedPanel title="Competitor settings" description="Available with full access" />
           <LockedPanel title="Advisor context" description="Available with full access" />
         </section>
+        <AppCard className="p-6" id="preferences">
+          <WorkspaceHeader eyebrow="Preferences" title="Appearance" description="Choose how QueryCite looks on this device." />
+          <div className="mt-6 max-w-xl"><AppearanceSettings /></div>
+        </AppCard>
       </DashboardShell>
     );
   }
@@ -41,8 +46,8 @@ export default async function ProfilePage() {
     <DashboardShell
       user={{ email: user.email, name: user.name, isAdmin: access.isAdmin }}
       title="Profile"
-      description="Company, audience, keyword, geography, tone, and competitor context."
-      badge={<StatusPill tone={access.qaAccess ? "cyan" : "green"}>{access.qaAccess ? "QA" : "Full access"}</StatusPill>}
+      description="Manage your business details, competitors, and preferences."
+      badge={<StatusPill tone={access.qaAccess ? "cyan" : "green"}>{access.qaAccess ? "Admin" : "Full access"}</StatusPill>}
     >
       <AppCard className="p-6">
         <WorkspaceHeader
@@ -52,7 +57,7 @@ export default async function ProfilePage() {
         />
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
           <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm font-semibold text-emerald-900">Signed in as {user.email}</div>
-          <div className="rounded-2xl border border-violet-100 bg-violet-50 p-4 text-sm font-semibold text-violet-900">Competitor changes: up to {access.limits.competitorChanges} per period</div>
+          <div className="rounded-2xl border border-violet-100 bg-violet-50 p-4 text-sm font-semibold text-violet-900">Competitor update limit: {access.limits.competitorChanges} this period</div>
         </div>
       </AppCard>
       <ProfileSettings subscriptionId={access.subscriptionId || `admin-qa-${user.id}`} email={access.email ?? user.email} planName={access.rawPlanName ?? access.planName} />

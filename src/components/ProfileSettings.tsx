@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { AppearanceSettings } from "@/components/AppearanceSettings";
 import { ActionButton, AlertBox, AppCard, FormField, StatusPill } from "@/components/ui";
 
 type ProfileSettingsProps = {
@@ -200,7 +201,7 @@ export function ProfileSettings({ subscriptionId, email, planName }: ProfileSett
           </div>
           <div className="mt-6 grid gap-4 md:grid-cols-3">
             <FormField label="Name"><input value={profile.name} onChange={(event) => updateProfile("name", event.target.value)} className={inputClass} /></FormField>
-            <FormField label="Work email" helper="Email change is not available yet."><input value={email || ""} readOnly className={inputClass} /></FormField>
+            <FormField label="Email" helper="Email change is not available yet."><input value={email || ""} readOnly className={inputClass} /></FormField>
             <FormField label="Role/designation"><input value={profile.role_designation} onChange={(event) => updateProfile("role_designation", event.target.value)} className={inputClass} /></FormField>
           </div>
         </AppCard>
@@ -251,8 +252,11 @@ export function ProfileSettings({ subscriptionId, email, planName }: ProfileSett
 
         <AppCard className="p-6" id="preferences">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-violet-700">Preferences</p>
-          <h2 className="mt-2 text-2xl font-semibold text-slate-950">Advisor tone</h2>
-          <div className="mt-6"><FormField label="Tone of voice"><input value={profile.tone_of_voice} onChange={(event) => updateProfile("tone_of_voice", event.target.value)} placeholder="Clear, analytical, practical" className={inputClass} /></FormField></div>
+          <h2 className="mt-2 text-2xl font-semibold text-slate-950">Advisor and appearance</h2>
+          <div className="mt-6 grid gap-6 lg:grid-cols-2">
+            <FormField label="Tone of voice"><input value={profile.tone_of_voice} onChange={(event) => updateProfile("tone_of_voice", event.target.value)} placeholder="Clear, analytical, practical" className={inputClass} /></FormField>
+            <AppearanceSettings />
+          </div>
         </AppCard>
       </div>
 

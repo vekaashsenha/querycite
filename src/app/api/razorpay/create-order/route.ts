@@ -80,7 +80,7 @@ export async function POST(request: Request) {
     console.error("Razorpay beta order creation failed", error);
     const message = error instanceof Error ? error.message : "Razorpay payment is temporarily unavailable.";
     const safeMessage = /RAZORPAY_|NEXT_PUBLIC_RAZORPAY/.test(message)
-      ? "Razorpay test payment is not configured yet. Add the required Test Mode environment variables."
+      ? "Secure payment is not configured yet."
       : message;
 
     return NextResponse.json({ error: safeMessage }, { status: 500 });

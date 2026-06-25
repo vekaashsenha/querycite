@@ -32,6 +32,7 @@ type PaymentTemplateData = {
   amount?: string | null;
   nextBillingDate?: string | null;
   reportUrl?: string | null;
+  receiptUrl?: string | null;
   hasFullReportAccess?: boolean;
 };
 
@@ -117,16 +118,17 @@ export function feedbackReceivedAdminTemplate(data: FeedbackTemplateData): Email
 
 export function paymentSuccessUserTemplate(data: PaymentTemplateData): EmailTemplate {
   const subject = "QueryCite payment received";
-  const title = data.hasFullReportAccess ? "Your full report access is ready" : "Payment test received";
+  const title = data.hasFullReportAccess ? "Your full report access is ready" : "Payment received";
   const accessCopy = data.hasFullReportAccess
     ? "Your payment was verified for full report access. You can view the report online and download the full PDF when opening the protected report page."
-    : "This payment test validates checkout, webhook, Supabase records, and email flow. It does not unlock long-term full report access.";
-  const html = shell(title, `<p>${escapeHtml(accessCopy)}</p><p><strong>Plan:</strong> ${escapeHtml(data.planName || "-")}<br/><strong>Payment ID:</strong> ${escapeHtml(data.paymentId || "-")}</p>${data.hasFullReportAccess ? ctaButton(data.reportUrl, "View & Download Full Report") : ""}`);
+    : "Your payment was received. You can review the payment receipt from your QueryCite billing area.";
+  const html = shell(title, `<p>${escapeHtml(accessCopy)}</p><p><strong>Plan:</strong> ${escapeHtml(data.planName || "-")}<br/><strong>Payment ID:</strong> ${escapeHtml(data.paymentId || "-")}</p>${data.hasFullReportAccess ? ctaButton(data.reportUrl, "View & Download Full Report") : ""}${ctaButton(data.receiptUrl, "View invoice/receipt")}`);
   const text = textLines([
     accessCopy,
     `Plan: ${data.planName || "-"}`,
     `Payment ID: ${data.paymentId || "-"}`,
     data.hasFullReportAccess && data.reportUrl ? `View & Download Full Report: ${data.reportUrl}` : null,
+    data.receiptUrl ? `View invoice/receipt: ${data.receiptUrl}` : null,
   ]);
   return { subject, html, text };
 }
@@ -134,23 +136,23 @@ export function paymentSuccessUserTemplate(data: PaymentTemplateData): EmailTemp
 export function paymentFailedUserTemplate(data: PaymentTemplateData): EmailTemplate {
   const subject = "QueryCite payment could not be completed";
   const title = "Payment could not be completed";
-  const html = shell(title, `<p>A QueryCite payment event failed in test mode.</p><p><strong>Plan:</strong> ${escapeHtml(data.planName || "-")}<br/><strong>Status:</strong> ${escapeHtml(data.status || "failed")}</p><p>You can try again or contact QueryCite support.</p>`);
-  const text = textLines(["A QueryCite payment event failed in test mode.", `Plan: ${data.planName || "-"}`, `Status: ${data.status || "failed"}`, "You can try again or contact QueryCite support."]);
+  const html = shell(title, `<p>Your QueryCite payment could not be completed.</p><p><strong>Plan:</strong> ${escapeHtml(data.planName || "-")}<br/><strong>Status:</strong> ${escapeHtml(data.status || "failed")}</p><p>You can try again or contact QueryCite support.</p>`);
+  const text = textLines(["Your QueryCite payment could not be completed.", `Plan: ${data.planName || "-"}`, `Status: ${data.status || "failed"}`, "You can try again or contact QueryCite support."]);
   return { subject, html, text };
 }
 
 export function subscriptionActiveUserTemplate(data: PaymentTemplateData): EmailTemplate {
   const subject = "Your QueryCite subscription is active";
-  const title = "Subscription test status is active";
-  const html = shell(title, `<p>Your QueryCite subscription event was verified in test mode.</p><p><strong>Plan:</strong> ${escapeHtml(data.planName || "-")}<br/><strong>Subscription ID:</strong> ${escapeHtml(data.subscriptionId || "-")}<br/><strong>Next billing date:</strong> ${escapeHtml(data.nextBillingDate || "-")}</p>${ctaButton(data.reportUrl, "View & Download Full Report")}`);
-  const text = textLines(["Your QueryCite subscription event was verified in test mode.", `Plan: ${data.planName || "-"}`, `Subscription ID: ${data.subscriptionId || "-"}`, `Next billing date: ${data.nextBillingDate || "-"}`, data.reportUrl ? `View & Download Full Report: ${data.reportUrl}` : null]);
+  const title = "Your subscription is active";
+  const html = shell(title, `<p>Your QueryCite subscription is active.</p><p><strong>Plan:</strong> ${escapeHtml(data.planName || "-")}<br/><strong>Subscription ID:</strong> ${escapeHtml(data.subscriptionId || "-")}<br/><strong>Next billing date:</strong> ${escapeHtml(data.nextBillingDate || "-")}</p>${ctaButton(data.reportUrl, "View & Download Full Report")}`);
+  const text = textLines(["Your QueryCite subscription is active.", `Plan: ${data.planName || "-"}`, `Subscription ID: ${data.subscriptionId || "-"}`, `Next billing date: ${data.nextBillingDate || "-"}`, data.reportUrl ? `View & Download Full Report: ${data.reportUrl}` : null]);
   return { subject, html, text };
 }
 
 export function subscriptionStatusChangedUserTemplate(data: PaymentTemplateData): EmailTemplate {
   const subject = "Your QueryCite subscription status changed";
   const title = "Subscription status changed";
-  const html = shell(title, `<p>Your QueryCite subscription status changed in test mode.</p><p><strong>Status:</strong> ${escapeHtml(data.status || "-")}<br/><strong>Plan:</strong> ${escapeHtml(data.planName || "-")}<br/><strong>Subscription ID:</strong> ${escapeHtml(data.subscriptionId || "-")}</p>`);
-  const text = textLines(["Your QueryCite subscription status changed in test mode.", `Status: ${data.status || "-"}`, `Plan: ${data.planName || "-"}`, `Subscription ID: ${data.subscriptionId || "-"}`]);
+  const html = shell(title, `<p>Your QueryCite subscription status changed.</p><p><strong>Status:</strong> ${escapeHtml(data.status || "-")}<br/><strong>Plan:</strong> ${escapeHtml(data.planName || "-")}<br/><strong>Subscription ID:</strong> ${escapeHtml(data.subscriptionId || "-")}</p>`);
+  const text = textLines(["Your QueryCite subscription status changed.", `Status: ${data.status || "-"}`, `Plan: ${data.planName || "-"}`, `Subscription ID: ${data.subscriptionId || "-"}`]);
   return { subject, html, text };
 }

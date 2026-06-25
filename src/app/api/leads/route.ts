@@ -63,7 +63,7 @@ export async function POST(request: Request) {
     }
 
     if (!emailPattern.test(email)) {
-      return NextResponse.json({ error: "Please enter a valid work email." }, { status: 400 });
+      return NextResponse.json({ error: "Please enter a valid email." }, { status: 400 });
     }
 
     if (!body.privacyTermsAccepted) {

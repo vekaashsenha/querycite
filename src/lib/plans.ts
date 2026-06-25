@@ -12,12 +12,12 @@ export type PlanLimits = {
 
 export const planLimits: Record<PaidPlanName, PlanLimits> = {
   free: { advisorCredits: 0, blogBriefs: 0, fixPacks: 0, competitorAdvice: 0, competitors: 0, competitorChanges: 0 },
-  launchTrial: { advisorCredits: 30, blogBriefs: 2, fixPacks: 10, competitorAdvice: 3, competitors: 3, competitorChanges: 3 },
-  starter: { advisorCredits: 50, blogBriefs: 2, fixPacks: 10, competitorAdvice: 3, competitors: 3, competitorChanges: 3 },
-  pro: { advisorCredits: 200, blogBriefs: 8, fixPacks: 40, competitorAdvice: 5, competitors: 5, competitorChanges: 3 },
-  agency: { advisorCredits: 500, blogBriefs: 20, fixPacks: 100, competitorAdvice: 10, competitors: 10, competitorChanges: 3 },
-  betaFullReport: { advisorCredits: 50, blogBriefs: 2, fixPacks: 10, competitorAdvice: 3, competitors: 3, competitorChanges: 3 },
-  adminQa: { advisorCredits: 1000, blogBriefs: 100, fixPacks: 100, competitorAdvice: 100, competitors: 10, competitorChanges: 100 },
+  launchTrial: { advisorCredits: 100, blogBriefs: 20, fixPacks: 20, competitorAdvice: 10, competitors: 3, competitorChanges: 10 },
+  starter: { advisorCredits: 200, blogBriefs: 25, fixPacks: 25, competitorAdvice: 10, competitors: 3, competitorChanges: 10 },
+  pro: { advisorCredits: 1000, blogBriefs: 100, fixPacks: 100, competitorAdvice: 100, competitors: 5, competitorChanges: 100 },
+  agency: { advisorCredits: 3000, blogBriefs: 300, fixPacks: 300, competitorAdvice: 300, competitors: 10, competitorChanges: 300 },
+  betaFullReport: { advisorCredits: 100, blogBriefs: 20, fixPacks: 20, competitorAdvice: 10, competitors: 3, competitorChanges: 10 },
+  adminQa: { advisorCredits: 1000000, blogBriefs: 1000000, fixPacks: 1000000, competitorAdvice: 1000000, competitors: 10, competitorChanges: 1000000 },
 };
 
 export const advisorActionCosts: Record<AdvisorActionType, { credits: number; blogBriefs: number; fixPacks: number; competitorAdvice: number }> = {

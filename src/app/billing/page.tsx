@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { DashboardShell, WorkspaceHeader } from "@/components/DashboardShell";
 import { AppCard, EmptyState, MetricCard, StatusPill } from "@/components/ui";
-import { formatPaise, getPaidAccessContextForUser, getPaymentHistoryForUser } from "@/lib/paid-foundation";
+import { formatPaise, getPaidAccessContextForUser, getPaymentHistoryForUser, isPaidPaymentRecord } from "@/lib/paid-foundation";
 import { requireAuthenticatedUser, syncAuthenticatedUser } from "@/lib/auth/server";
 
 function formatDate(value: string | null | undefined) {
@@ -14,7 +14,8 @@ export default async function BillingPage() {
   await syncAuthenticatedUser(user);
   const access = await getPaidAccessContextForUser(user);
   const payments = await getPaymentHistoryForUser(user);
-  const badgeText = access.qaAccess ? "QA" : access.isPaidBetaAccess ? "Beta active" : access.isExpiredBetaAccess ? "Beta expired" : access.verifiedPaidAccess ? "Verified" : "No active access";
+  const paidPayments = payments.filter(isPaidPaymentRecord);
+  const badgeText = access.qaAccess ? "Admin" : access.isPaidBetaAccess ? "Beta active" : access.isExpiredBetaAccess ? "Beta expired" : access.verifiedPaidAccess ? "Paid access active" : "No active access";
   const badgeTone = access.qaAccess ? "cyan" : access.isPaidBetaAccess ? "green" : access.isExpiredBetaAccess ? "amber" : access.verifiedPaidAccess ? "green" : "amber";
 
   return (
@@ -25,15 +26,15 @@ export default async function BillingPage() {
       badge={<StatusPill tone={badgeTone}>{badgeText}</StatusPill>}
     >
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4" id="usage">
-        <MetricCard label="Current plan" value={access.rawPlanName || access.planName} detail={access.isPaidBetaAccess ? "Paid beta access" : "Account record"} tone="violet" />
-        <MetricCard label="Payment status" value={access.status} detail={access.qaAccess ? "QA access" : access.verifiedPaidAccess ? "Full access allowed" : "Full access locked"} tone={badgeTone} />
-        <MetricCard label="Amount paid" value={formatPaise(access.amountPaise, access.currency)} detail={access.couponCode ? "Cohort offer applied" : "Latest access record"} tone="cyan" />
-        <MetricCard label="Valid until" value={formatDate(access.accessEndsAt ?? access.currentPeriodEnd)} detail={access.isPaidBetaAccess || access.isExpiredBetaAccess ? "1-month beta access" : "Contact support for changes"} tone="slate" />
+        <MetricCard label="Current plan" value={access.rawPlanName || access.planName} detail={access.verifiedPaidAccess ? "Full report access" : "Free access"} tone="violet" />
+        <MetricCard label="Payment status" value={access.status} detail={access.qaAccess ? "Admin access" : access.verifiedPaidAccess ? "Paid access active" : "Full access locked"} tone={badgeTone} />
+        <MetricCard label="Amount paid" value={formatPaise(access.amountPaise, access.currency)} detail={access.couponCode ? "Cohort offer applied" : "Most recent payment"} tone="cyan" />
+        <MetricCard label="Access active until" value={formatDate(access.accessEndsAt ?? access.currentPeriodEnd)} detail={access.isPaidBetaAccess || access.isExpiredBetaAccess ? "1-month access" : "Current access period"} tone="slate" />
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
         <AppCard className="p-6">
-          <WorkspaceHeader eyebrow="Access" title="Current billing details" description="Paid access follows Razorpay payment capture and webhook confirmation." />
+          <WorkspaceHeader eyebrow="Access" title="Current billing details" description="Your plan, payment status, and current access period." />
           <div className="mt-6 grid gap-3">
             {[
               ["Signed in", user.email],
@@ -43,7 +44,7 @@ export default async function BillingPage() {
               ["Amount", formatPaise(access.amountPaise, access.currency)],
               ["Starts", formatDate(access.accessStartsAt ?? access.currentPeriodStart)],
               ["Valid until", formatDate(access.accessEndsAt ?? access.currentPeriodEnd)],
-              ["Access ID", access.subscriptionId || "—"],
+              ["Renewal date", formatDate(access.renewalDate ?? access.accessEndsAt ?? access.currentPeriodEnd)],
             ].map(([label, value]) => (
               <div key={label} className="flex items-start justify-between gap-4 rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm">
                 <p className="font-semibold text-slate-500">{label}</p>
@@ -54,15 +55,16 @@ export default async function BillingPage() {
           {access.isExpiredBetaAccess ? <p className="mt-5 rounded-2xl border border-amber-100 bg-amber-50 p-4 text-sm font-semibold leading-6 text-amber-900">Paid beta access has expired. Renew to reopen full reports, exports, competitor comparison, and AI Advisor.</p> : null}
           <div className="mt-5 flex flex-wrap gap-3">
             <Link href="/pricing" className="inline-flex min-h-11 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-semibold text-white">View plans</Link>
+            <Link href="/billing/invoices" target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center justify-center rounded-full border border-violet-300 bg-violet-50 px-5 text-sm font-semibold text-violet-900">View invoices & receipts</Link>
             <Link href="/contact" className="inline-flex min-h-11 items-center justify-center rounded-full border border-slate-300 bg-white px-5 text-sm font-semibold text-slate-900">Contact support</Link>
           </div>
         </AppCard>
 
         <AppCard className="p-6">
-          <WorkspaceHeader eyebrow="History" title="Recorded payments" description="Payments linked to this authenticated account." />
-          {payments.length ? (
+          <WorkspaceHeader eyebrow="History" title="Payment history" description="Confirmed payments linked to your account." />
+          {paidPayments.length ? (
             <div className="mt-6 grid gap-3">
-              {payments.map((payment) => (
+              {paidPayments.map((payment) => (
                 <div key={payment.id} className="grid gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm md:grid-cols-[0.7fr_0.65fr_0.55fr_0.7fr_1fr] md:items-center">
                   <span>{formatDate(payment.createdAt)}</span>
                   <span className="font-semibold text-slate-950">{formatPaise(payment.amount, payment.currency)}</span>

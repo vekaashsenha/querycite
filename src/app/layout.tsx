@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
+import { ThemeProvider } from "@/components/ThemeProvider";
 import { getCurrentUser, isAdminUser } from "@/lib/auth/server";
 import "./globals.css";
+import "./theme.css";
 
 export const metadata: Metadata = {
   title: "QueryCite",
@@ -14,11 +16,13 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   const isAdmin = await isAdminUser(user);
 
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body>
-        <Header user={user ? { email: user.email, name: user.name, isAdmin } : null} />
-        {children}
-        <Footer />
+        <ThemeProvider>
+          <Header user={user ? { email: user.email, name: user.name, isAdmin } : null} />
+          {children}
+          <Footer />
+        </ThemeProvider>
       </body>
     </html>
   );

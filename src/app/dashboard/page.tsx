@@ -33,7 +33,7 @@ export default async function DashboardPage() {
   const hasWorkspaceAccess = access.verifiedPaidAccess || access.qaAccess;
   const advisorReport = hasWorkspaceAccess ? latestReport?.fullReportData ?? null : null;
   const latestScore = latestReport ? `${latestReport.aiVisibilityScore}/100` : "—";
-  const badgeText = access.qaAccess ? "QA" : access.isPaidBetaAccess ? "Beta active" : access.isExpiredBetaAccess ? "Beta expired" : access.verifiedPaidAccess ? "Full access" : "Free";
+  const badgeText = access.qaAccess ? "Admin" : access.isPaidBetaAccess ? "Beta active" : access.isExpiredBetaAccess ? "Beta expired" : access.verifiedPaidAccess ? "Full access" : "Free";
   const badgeTone = access.qaAccess ? "cyan" : access.isPaidBetaAccess ? "green" : access.isExpiredBetaAccess ? "amber" : access.verifiedPaidAccess ? "green" : "slate";
 
   return (
@@ -47,7 +47,7 @@ export default async function DashboardPage() {
         <MetricCard label="Latest score" value={latestScore} detail={latestReport ? latestReport.finalUrl || latestReport.websiteUrl : "Run your first audit"} tone="violet" />
         <MetricCard label="Reports generated" value={reports.length} detail="Linked to this account" tone="green" />
         <MetricCard label="Advisor credits" value={hasWorkspaceAccess ? access.limits.advisorCredits : 0} detail={hasWorkspaceAccess ? "Available per billing period" : "Unlock with full access"} tone="cyan" />
-        <MetricCard label="Competitor changes" value={hasWorkspaceAccess ? `Up to ${access.limits.competitorChanges}` : "Locked"} detail="Per billing period" tone="amber" />
+        <MetricCard label="Competitor updates" value={hasWorkspaceAccess ? access.limits.competitorChanges : "Locked"} detail="Available this period" tone="amber" />
       </section>
 
       {access.isExpiredBetaAccess ? (
@@ -95,7 +95,7 @@ export default async function DashboardPage() {
           </div>
           <div className="mt-5 grid gap-3">
             {[
-              ["Valid until", hasWorkspaceAccess ? (access.qaAccess ? "QA access" : formatDate(access.accessEndsAt ?? getAdvisorResetDate(access))) : "Not active"],
+              ["Valid until", hasWorkspaceAccess ? (access.qaAccess ? "Admin access" : formatDate(access.accessEndsAt ?? getAdvisorResetDate(access))) : "Not active"],
               ["Competitors", hasWorkspaceAccess ? `${access.limits.competitors} domains` : "Locked"],
               ["Exports", hasWorkspaceAccess ? "Full PDF + CSV" : "Free PDF"],
               ["Beta offer", access.couponCode ? "Cohort offer applied" : "—"],

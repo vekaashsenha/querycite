@@ -12,7 +12,7 @@ export async function POST(request: Request) {
     const password = typeof body.password === "string" ? body.password : "";
     const next = safeReturnPath(body.next);
 
-    if (!emailPattern.test(email)) return NextResponse.json({ error: "Please enter a valid work email." }, { status: 400 });
+    if (!emailPattern.test(email)) return NextResponse.json({ error: "Please enter a valid email." }, { status: 400 });
     if (!password) return NextResponse.json({ error: "Please enter your password." }, { status: 400 });
 
     const session = await signInWithPassword(email, password);

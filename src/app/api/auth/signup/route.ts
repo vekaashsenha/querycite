@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     const next = safeReturnPath(body.next);
 
     if (!name) return NextResponse.json({ error: "Please enter your name." }, { status: 400 });
-    if (!emailPattern.test(email)) return NextResponse.json({ error: "Please enter a valid work email." }, { status: 400 });
+    if (!emailPattern.test(email)) return NextResponse.json({ error: "Please enter a valid email." }, { status: 400 });
     if (password.length < 8) return NextResponse.json({ error: "Password must be at least 8 characters." }, { status: 400 });
 
     const session = await signUpWithPassword(request, name, email, password);

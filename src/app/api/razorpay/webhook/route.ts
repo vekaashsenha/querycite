@@ -14,6 +14,12 @@ type StoredSubscription = {
   id?: string;
   razorpay_subscription_id?: string;
   razorpay_order_id?: string;
+  status?: string | null;
+  paid_access?: boolean | null;
+  current_period_start?: string | null;
+  current_period_end?: string | null;
+  access_starts_at?: string | null;
+  access_ends_at?: string | null;
 };
 
 type StoredPayment = {
@@ -144,6 +150,46 @@ function accessWindowFrom(payload: JsonRecord, subscription: JsonRecord, payment
   return window;
 }
 
+function accessWindowForDuration(startsAt: Date, days: number) {
+  const endsAt = new Date(startsAt);
+  endsAt.setDate(endsAt.getDate() + days);
+  return { startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString() };
+}
+
+async function protectedOneTimeAccessWindow(payload: JsonRecord, subscription: JsonRecord, payment: JsonRecord, orderId: string, userId: string | null, email: string | null) {
+  const capturedAt = capturedAtFrom(payload, payment);
+  const days = Number(noteText(subscription, payment, "access_duration_days") || 30);
+  const durationDays = Number.isFinite(days) && days > 0 ? days : 30;
+  if (!userId && !email) return accessWindowForDuration(capturedAt, durationDays);
+
+  const rows = await selectSupabaseRows<StoredSubscription>("subscriptions", {
+    select: "id,razorpay_order_id,status,paid_access,current_period_start,current_period_end,access_starts_at,access_ends_at",
+    or: userId ? `(user_id.eq.${userId},email.eq.${email || ""})` : `(email.eq.${email || ""})`,
+    order: "updated_at.desc",
+    limit: "50",
+  });
+  const futureEnd = rows
+    .filter((row) => row.razorpay_order_id !== orderId && row.paid_access === true && row.status === "active")
+    .map((row) => row.access_ends_at ?? row.current_period_end)
+    .filter((value): value is string => Boolean(value && Date.parse(value) > capturedAt.getTime()))
+    .sort((left, right) => Date.parse(right) - Date.parse(left))[0];
+
+  return accessWindowForDuration(futureEnd ? new Date(futureEnd) : capturedAt, durationDays);
+}
+
+async function storedAccessWindow(subscriptionRowId: string | null) {
+  if (!subscriptionRowId) return null;
+  const rows = await selectSupabaseRows<StoredSubscription>("subscriptions", {
+    select: "id,current_period_start,current_period_end,access_starts_at,access_ends_at",
+    id: `eq.${subscriptionRowId}`,
+    limit: "1",
+  });
+  const row = rows[0];
+  const startsAt = row?.access_starts_at ?? row?.current_period_start ?? null;
+  const endsAt = row?.access_ends_at ?? row?.current_period_end ?? null;
+  return startsAt && endsAt ? { startsAt, endsAt } : null;
+}
+
 function getAppBaseUrl() {
   return process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || "https://www.querycite.com";
 }
@@ -272,8 +318,18 @@ async function upsertSubscription(payload: JsonRecord, eventName: string) {
     const userId = userIdFrom(subscription, payment);
     const email = emailFrom(subscription, payment);
     const captured = eventName === "payment.captured";
+    const existing = await selectSupabaseRows<StoredSubscription>("subscriptions", {
+      select: "id,razorpay_order_id,current_period_start,current_period_end,access_starts_at,access_ends_at",
+      razorpay_order_id: `eq.${orderId}`,
+      limit: "1",
+    });
     const couponAllows = captured ? await couponAllowsCapturedAccess(couponCode, userId, email, paymentId) : false;
-    const accessWindow = captured && couponAllows ? accessWindowFrom(payload, subscription, payment) : { startsAt: null, endsAt: null };
+    const existingStartsAt = existing[0]?.access_starts_at ?? existing[0]?.current_period_start ?? null;
+    const existingEndsAt = existing[0]?.access_ends_at ?? existing[0]?.current_period_end ?? null;
+    const existingWindow = existingStartsAt && existingEndsAt ? { startsAt: existingStartsAt, endsAt: existingEndsAt } : null;
+    const accessWindow = captured && couponAllows
+      ? existingWindow ?? await protectedOneTimeAccessWindow(payload, subscription, payment, orderId, userId, email)
+      : { startsAt: null, endsAt: null };
     const status = eventName === "payment.failed" ? "failed" : captured && couponAllows ? "active" : couponCode ? "coupon_invalid" : "pending";
 
     const row = {
@@ -306,12 +362,6 @@ async function upsertSubscription(payload: JsonRecord, eventName: string) {
       metadata: { event: eventName, notes: notesFrom(payment), access_type: "paid_beta_one_time" },
       updated_at: now,
     };
-
-    const existing = await selectSupabaseRows<StoredSubscription>("subscriptions", {
-      select: "id",
-      razorpay_order_id: `eq.${orderId}`,
-      limit: "1",
-    });
 
     if (existing[0]?.id) {
       const updated = await updateSupabaseRows("subscriptions", { id: `eq.${existing[0].id}` }, row);
@@ -379,7 +429,9 @@ async function upsertPayment(payload: JsonRecord, eventName: string, subscriptio
   const now = new Date().toISOString();
   const paymentType = paymentTypeFrom(subscription, payment);
   const captured = eventName === "payment.captured";
-  const accessWindow = paymentType === "one_time_beta" && captured ? accessWindowFrom(payload, subscription, payment) : { startsAt: null, endsAt: null };
+  const accessWindow = paymentType === "one_time_beta" && captured
+    ? await storedAccessWindow(subscriptionRowId) ?? accessWindowFrom(payload, subscription, payment)
+    : { startsAt: null, endsAt: null };
   const row = {
     user_id: userIdFrom(subscription, payment),
     subscription_id: subscriptionRowId,
@@ -446,6 +498,7 @@ async function sendWebhookEmails(payload: JsonRecord, eventName: string, subscri
     amount: amount ? `${(amount / 100).toLocaleString("en-IN", { style: "currency", currency: text(payment.currency) || "INR" })}` : null,
     nextBillingDate: unixSecondsToIso(subscription.charge_at) || accessWindow.endsAt,
     reportUrl: reportUrlFor(),
+    receiptUrl: paymentRowId ? `${getAppBaseUrl()}/billing/invoices/${paymentRowId}` : null,
     hasFullReportAccess,
   };
   const emails: Array<Promise<unknown>> = [];

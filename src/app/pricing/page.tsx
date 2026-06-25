@@ -87,7 +87,7 @@ export default async function PricingPage() {
             </div>
             <div className="mt-6 flex-1" />
             {plan.planKey ? (
-              <RazorpayCheckoutButton plan={plan.planKey} mode="order" name={user?.name ?? undefined} email={user?.email} buttonLabel={plan.cta} helperText="Razorpay checkout charges in INR." />
+              <RazorpayCheckoutButton plan={plan.planKey} mode="order" name={user?.name ?? undefined} email={user?.email} buttonLabel={plan.cta} helperText="Secure checkout. Paid access begins after payment confirmation." />
             ) : plan.href === "/#audit" ? (
               <PrimaryLink href={plan.href}>{plan.cta}</PrimaryLink>
             ) : (

@@ -60,17 +60,17 @@ export function ForgotPasswordForm() {
   }
 
   return (
-    <PageShell eyebrow="Account recovery" title="Reset your QueryCite password" description="Enter your work email and we will send a secure password reset link if an account exists for that email.">
+    <PageShell eyebrow="Account recovery" title="Reset your QueryCite password" description="Enter your email and we will send a secure password reset link if an account exists for that email.">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-2xl font-semibold text-slate-950">Forgot password?</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-600">Use the same work email you used for QueryCite.</p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">Use the same email you used for QueryCite.</p>
         </div>
         <StatusPill tone="slate">Secure reset</StatusPill>
       </div>
       <form onSubmit={submit} className="mt-7 grid gap-4">
         <label className="grid gap-2 text-sm font-semibold text-slate-700">
-          Work email
+          Email
           <input value={email} onChange={(event) => setEmail(event.target.value)} type="email" autoComplete="email" className={inputClass} />
         </label>
         {error ? <p className="rounded-2xl border border-rose-100 bg-rose-50 p-4 text-sm font-semibold leading-6 text-rose-700">{error}</p> : null}

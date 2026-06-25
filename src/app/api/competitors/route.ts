@@ -194,7 +194,8 @@ export async function POST(request: Request) {
     });
 
     if (changesUsed + changed.length > changeLimit) {
-      return NextResponse.json({ error: "You have used all competitor changes for this billing period." }, { status: 429 });
+      const accessEnd = limit.reset_date ?? periodEnd(access.currentPeriodEnd);
+      return NextResponse.json({ error: `You have used this period's limit for competitor updates. Your paid access remains active until ${new Date(String(accessEnd)).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}.` }, { status: 429 });
     }
 
     const now = new Date().toISOString();

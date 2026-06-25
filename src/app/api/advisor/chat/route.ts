@@ -191,6 +191,18 @@ function usageAllows(row: UsageRow | null, planName: PaidPlanName, actionType: A
   };
 }
 
+function exhaustedFeature(row: UsageRow | null, planName: PaidPlanName, actionType: AdvisorActionType) {
+  const check = usageAllows(row, planName, actionType);
+  if (check.usage.blogBriefsUsed + check.cost.blogBriefs > check.limits.blogBriefs) return "blog brief";
+  if (check.usage.fixPacksUsed + check.cost.fixPacks > check.limits.fixPacks) return "fix pack";
+  if (check.usage.competitorAdviceUsed + check.cost.competitorAdvice > check.limits.competitorAdvice) return "competitor guidance";
+  return "AI Advisor";
+}
+
+function formatAccessDate(value: string) {
+  return new Date(value).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+}
+
 async function getUsage(subscriptionId: string, userId: string, planName: PaidPlanName, periodStart: string, periodEnd: string, email: string | null, reportId: string | null) {
   if (!isSupabaseAdminConfigured()) return null;
   const rows = await selectSupabaseRows<UsageRow>("advisor_credit_usage", {
@@ -250,15 +262,33 @@ export async function GET() {
 
   await syncAuthenticatedUser(user);
   const access = await getPaidAccessContextForUser(user);
-  if (!access.qaAccess) {
+  if (!access.qaAccess && (!access.verifiedPaidAccess || !access.subscriptionId)) {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
 
+  const planName = access.qaAccess ? "adminQa" : access.planName;
+  const periodStart = access.currentPeriodStart || access.accessStartsAt || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+  const periodEnd = access.currentPeriodEnd || access.accessEndsAt || new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString();
+  const usageRow = access.qaAccess || !access.subscriptionId
+    ? null
+    : await getUsage(access.subscriptionId, user.id, planName, periodStart, periodEnd, access.email ?? user.email, null);
+  const usage = usageRow ? {
+    creditsUsed: usageRow.advisor_credits_used ?? usageRow.credits_used ?? 0,
+    blogBriefsUsed: usageRow.blog_briefs_used ?? 0,
+    fixPacksUsed: usageRow.fix_packs_used ?? 0,
+    competitorAdviceUsed: usageRow.competitor_advice_used ?? 0,
+  } : { creditsUsed: 0, blogBriefsUsed: 0, fixPacksUsed: 0, competitorAdviceUsed: 0 };
+
   return NextResponse.json({
-    diagnostics: serializeDiagnostics(diagnosticState({
-      accessState: "admin",
-      reportContext: "missing",
-    })),
+    usage,
+    limits: planLimits[planName],
+    resetDate: periodEnd,
+    ...(access.qaAccess ? {
+      diagnostics: serializeDiagnostics(diagnosticState({
+        accessState: "admin",
+        reportContext: "missing",
+      })),
+    } : {}),
   });
 }
 
@@ -319,7 +349,13 @@ export async function POST(request: Request) {
         usageRow = await getUsage(access.subscriptionId, user.id, planName, periodStart, periodEnd, access.email ?? user.email, body.reportId || null);
         const check = usageAllows(usageRow, planName, actionType);
         if (!check.allowed) {
-          return NextResponse.json({ error: "You have used all Advisor credits for this billing period.", usage: check.usage, limits: check.limits, resetDate }, { status: 429 });
+          const feature = exhaustedFeature(usageRow, planName, actionType);
+          return NextResponse.json({
+            error: `You have used this period's limit for ${feature}. Your paid access remains active until ${formatAccessDate(periodEnd)}.`,
+            usage: check.usage,
+            limits: check.limits,
+            resetDate,
+          }, { status: 429 });
         }
       }
     }

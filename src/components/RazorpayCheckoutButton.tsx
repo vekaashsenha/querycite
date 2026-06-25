@@ -94,7 +94,7 @@ export function RazorpayCheckoutButton({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const isOrderMode = mode === "order";
-  const defaultButtonLabel = isOrderMode ? "Start Beta" : "Start Test Checkout";
+  const defaultButtonLabel = isOrderMode ? "Start Beta" : "Start Checkout";
   const defaultHelperText = isOrderMode ? "You will be charged in INR through Razorpay." : "Payment flow is currently available for private validation.";
 
   async function startCheckout() {
@@ -132,7 +132,7 @@ export function RazorpayCheckoutButton({
         amount: data.amount,
         currency: data.currency || "INR",
         name: "QueryCite",
-        description: isOrderMode ? `QueryCite ${data.plan_name} paid beta access` : `QueryCite ${data.plan_name} subscription test checkout`,
+        description: isOrderMode ? `QueryCite ${data.plan_name} paid beta access` : `QueryCite ${data.plan_name} subscription checkout`,
         prefill: data.prefill,
         notes: data.notes || {
           product: "querycite",
