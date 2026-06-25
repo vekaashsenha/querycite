@@ -43,7 +43,7 @@ export async function POST(request: Request) {
     return NextResponse.json(checkoutData);
   } catch (error) {
     console.error("Razorpay test subscription creation failed", error);
-    const message = error instanceof Error ? error.message : "Razorpay test checkout is temporarily unavailable.";
+    const message = error instanceof Error ? error.message : "Secure checkout is temporarily unavailable.";
     const safeMessage = /RAZORPAY_|NEXT_PUBLIC_RAZORPAY/.test(message)
       ? "Secure checkout is not configured yet."
       : message;

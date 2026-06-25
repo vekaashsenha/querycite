@@ -117,7 +117,7 @@ function errorDetails(data: AdvisorApiResponse) {
 function UsageMeter({ label, used, total }: { label: string; used: number; total: number }) {
   const pct = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 100;
   return (
-    <div className="rounded-2xl border border-violet-100 bg-white p-3">
+    <div className="qc-surface rounded-2xl border border-violet-100 bg-white p-3">
       <div className="flex items-center justify-between gap-3 text-xs font-semibold text-slate-600">
         <span>{label}</span>
         <span>{used} / {total}</span>
@@ -372,7 +372,7 @@ export function AdvisorChat({ currentReportData, companyProfile, competitorData,
 
       <div ref={chatContainerRef} className="mt-4 grid max-h-[640px] gap-3 overflow-y-auto overscroll-contain pr-1" aria-live="polite">
         {messages.map((message) => (
-          <div key={message.id} className={`rounded-2xl border p-4 ${message.role === "assistant" ? "border-slate-200 bg-white" : "border-violet-100 bg-violet-100/70"}`}>
+          <div key={message.id} className={`rounded-2xl border p-4 ${message.role === "assistant" ? "qc-surface border-slate-200 bg-white" : "border-violet-100 bg-violet-100/70"}`}>
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{message.role === "assistant" ? "Advisor" : "You"}</p>
             <div className="mt-2 min-w-0 max-w-full">
               {message.role === "assistant" ? <AdvisorMarkdown content={message.content} /> : <div className="whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">{message.content}</div>}

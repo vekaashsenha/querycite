@@ -498,7 +498,7 @@ export function HomeExperience() {
       </section>
 
       <section className="px-5 py-12 sm:px-8">
-        <div className="mx-auto grid max-w-7xl gap-6 rounded-[2rem] border border-white/70 bg-gradient-to-r from-violet-50 via-white to-teal-50 p-6 shadow-sm lg:grid-cols-[0.95fr_1.05fr] lg:items-center lg:p-8">
+        <div className="theme-adaptive-soft mx-auto grid max-w-7xl gap-6 rounded-[2rem] border border-white/70 p-6 shadow-sm lg:grid-cols-[0.95fr_1.05fr] lg:items-center lg:p-8">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-700">Why QueryCite is different</p>
             <h2 className="mt-3 text-3xl font-semibold leading-tight text-slate-950">Free checkers show your score. QueryCite turns the score into fixes.</h2>
@@ -611,9 +611,9 @@ export function HomeExperience() {
             <div className="mt-6"><PrimaryLink href="/pricing">View pricing</PrimaryLink></div>
           </div>
           <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
-            <ClayCard><StatusPill tone="green">Free Audit</StatusPill><h3 className="mt-4 text-xl font-semibold leading-7">$0</h3></ClayCard>
-            <ClayCard><StatusPill>Launch Trial</StatusPill><h3 className="mt-4 text-xl font-semibold leading-7">$10 first month, then $29/month</h3></ClayCard>
-            <ClayCard><StatusPill tone="amber">Agency</StatusPill><h3 className="mt-4 text-xl font-semibold leading-7">From $149/month</h3></ClayCard>
+            <ClayCard><StatusPill tone="green">Free</StatusPill><h3 className="mt-4 text-xl font-semibold leading-7">$0</h3><p className="mt-2 text-sm text-slate-600">Limited audit and report</p></ClayCard>
+            <ClayCard><StatusPill>Starter</StatusPill><h3 className="mt-4 text-xl font-semibold leading-7">$20/month</h3><p className="mt-2 text-sm text-slate-600">For hands-on AEO/GEO fixes</p></ClayCard>
+            <ClayCard><StatusPill tone="cyan">Pro</StatusPill><h3 className="mt-4 text-xl font-semibold leading-7">$99/month</h3><p className="mt-2 text-sm text-slate-600">For ongoing team workflows</p></ClayCard>
           </div>
         </div>
       </section>

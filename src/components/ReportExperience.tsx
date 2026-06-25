@@ -251,7 +251,7 @@ function CopyButton({ text, label = "Copy" }: { text: string; label?: string }) 
 }
 function BetaBanner() {
   return (
-    <div className="mb-8 rounded-3xl border border-violet-200 bg-gradient-to-r from-violet-50 via-white to-teal-50 p-5 shadow-sm">
+    <div className="theme-adaptive-soft mb-8 rounded-3xl border border-violet-200 p-5 shadow-sm">
       <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-700">Beta Preview Mode</p>

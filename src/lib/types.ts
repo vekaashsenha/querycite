@@ -149,12 +149,12 @@ export type AdvisorPlanType = "free" | "launchTrial" | "starter" | "pro" | "agen
 
 export const advisorCreditLimits: Record<AdvisorPlanType, number> = {
   free: 0,
-  launchTrial: 30,
-  starter: 50,
-  pro: 200,
-  agency: 500,
-  privateBeta: 50,
-  betaFullReport: 50,
+  launchTrial: 100,
+  starter: 200,
+  pro: 1000,
+  agency: 3000,
+  privateBeta: 100,
+  betaFullReport: 100,
 };
 
 export type AdvisorCreditUsage = {

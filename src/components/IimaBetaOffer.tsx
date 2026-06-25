@@ -57,7 +57,7 @@ export function IimaBetaOffer({ name, email }: IimaBetaOfferProps) {
   }
 
   return (
-    <section className="mx-auto mt-8 max-w-6xl overflow-hidden rounded-3xl border border-cyan-200 bg-gradient-to-r from-cyan-50 via-white to-violet-50 p-6 shadow-sm">
+    <section className="theme-adaptive-soft mx-auto mt-8 max-w-6xl overflow-hidden rounded-3xl border border-cyan-200 p-6 shadow-sm">
       <div className="grid gap-6 lg:grid-cols-[0.92fr_1.08fr] lg:items-center">
         <div>
           <StatusPill tone="cyan">IIMA beta offer</StatusPill>
@@ -70,12 +70,12 @@ export function IimaBetaOffer({ name, email }: IimaBetaOfferProps) {
           <p className="mt-2 text-sm font-semibold text-slate-950">Pay ₹199 for 1-month paid beta access</p>
           <div className="mt-5 grid grid-cols-3 gap-2 text-center text-xs font-semibold text-slate-700">
             {["Full report", "AI Advisor", "1 month"].map((item) => (
-              <div key={item} className="rounded-2xl border border-white/80 bg-white p-3 shadow-sm">{item}</div>
+              <div key={item} className="qc-surface rounded-2xl border border-white/80 bg-white p-3 shadow-sm">{item}</div>
             ))}
           </div>
         </div>
 
-        <div className="rounded-3xl border border-white/80 bg-white p-5 shadow-sm">
+        <div className="qc-surface rounded-3xl border border-white/80 bg-white p-5 shadow-sm">
           <form onSubmit={applyCoupon} className="grid gap-3">
             <label htmlFor="cohort-coupon" className="text-sm font-semibold text-slate-700">Enter your cohort coupon code</label>
             <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
@@ -91,7 +91,7 @@ export function IimaBetaOffer({ name, email }: IimaBetaOfferProps) {
                 }}
                 placeholder="Enter coupon code"
                 autoComplete="off"
-                className="min-h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-800 outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
+                className="qc-input min-h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-800 outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
               />
               <button type="submit" disabled={isValidating || couponCode.trim().length === 0} className="min-h-12 rounded-2xl bg-slate-950 px-5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300">
                 {isValidating ? "Applying…" : "Apply"}

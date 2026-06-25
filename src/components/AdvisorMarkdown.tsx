@@ -108,7 +108,7 @@ function CodeBlock({ content, language }: { content: string; language: string })
   }
 
   return (
-    <div className="my-4 min-w-0 overflow-hidden rounded-2xl border border-slate-700 bg-slate-950 text-slate-100">
+    <div className="qc-code my-4 min-w-0 overflow-hidden rounded-2xl border border-slate-700 bg-slate-950 text-slate-100">
       <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-2 text-xs font-semibold text-slate-300">
         <span>{language}</span>
         <button type="button" onClick={() => void copyCode()} className="rounded-lg border border-white/15 px-2.5 py-1 text-white transition hover:bg-white/10" aria-label="Copy code block">
