@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { FloatingFeedbackButton } from "@/components/FeedbackCta";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { ThemeProvider } from "@/components/ThemeProvider";
@@ -22,6 +23,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
           <Header user={user ? { email: user.email, name: user.name, isAdmin } : null} />
           {children}
           <Footer />
+          <FloatingFeedbackButton />
         </ThemeProvider>
       </body>
     </html>

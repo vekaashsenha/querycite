@@ -65,3 +65,26 @@ export function FeedbackCta({ variant = "button", className = "" }: { variant?: 
 
   return <span className={className}>{link}</span>;
 }
+export function FloatingFeedbackButton() {
+  const feedbackUrl = getFeedbackFormUrl();
+
+  if (!feedbackUrl) {
+    return null;
+  }
+
+  return (
+    <a
+      href={feedbackUrl}
+      target="_blank"
+      rel="noreferrer"
+      aria-label="Give feedback about QueryCite"
+      className="qc-surface fixed bottom-24 right-4 z-40 inline-flex min-h-10 items-center gap-2 rounded-full border border-violet-200 px-3.5 text-xs font-semibold text-slate-950 shadow-[0_14px_40px_rgba(15,23,42,0.16)] backdrop-blur transition hover:-translate-y-0.5 hover:border-violet-300 hover:bg-violet-50 focus:outline-none focus:ring-4 focus:ring-violet-100 sm:bottom-6 sm:right-6 sm:min-h-11 sm:px-4 sm:text-sm"
+    >
+      <svg aria-hidden="true" viewBox="0 0 20 20" className="size-4" fill="none">
+        <path d="M5.4 14.1 4.5 17l2.9-.9 7.8-7.8a1.7 1.7 0 0 0 0-2.4l-1.1-1.1a1.7 1.7 0 0 0-2.4 0l-7.8 7.8Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.6" />
+        <path d="m10.8 5.7 3.5 3.5" stroke="currentColor" strokeLinecap="round" strokeWidth="1.6" />
+      </svg>
+      Feedback
+    </a>
+  );
+}
