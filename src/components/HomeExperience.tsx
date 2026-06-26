@@ -296,6 +296,120 @@ function FeatureClusterPanel({ cluster }: { cluster: (typeof featureClusters)[nu
     </article>
   );
 }
+const explainerVideoPlaceholder = "QUERYCITE_EXPLAINER_VIDEO_URL";
+
+function getExplainerVideoUrl() {
+  const value = process.env.NEXT_PUBLIC_EXPLAINER_VIDEO_URL?.trim();
+  if (!value || value === explainerVideoPlaceholder) return "";
+
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:" ? value : "";
+  } catch {
+    return "";
+  }
+}
+
+function getEmbeddedVideoUrl(videoUrl: string) {
+  try {
+    const url = new URL(videoUrl);
+    const host = url.hostname.replace(/^www\./, "");
+
+    if (host === "youtu.be") {
+      const videoId = url.pathname.split("/").filter(Boolean)[0];
+      return videoId ? `https://www.youtube.com/embed/${videoId}` : "";
+    }
+
+    if (host === "youtube.com" || host === "m.youtube.com") {
+      const videoId = url.searchParams.get("v") || (url.pathname.startsWith("/shorts/") ? url.pathname.split("/")[2] : "");
+      return videoId ? `https://www.youtube.com/embed/${videoId}` : "";
+    }
+
+    if (host === "vimeo.com") {
+      const videoId = url.pathname.split("/").filter(Boolean)[0];
+      return videoId ? `https://player.vimeo.com/video/${videoId}` : "";
+    }
+  } catch {
+    return "";
+  }
+
+  return "";
+}
+
+function ExplainerVideoSection({ videoUrl }: { videoUrl: string }) {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const embedUrl = getEmbeddedVideoUrl(videoUrl);
+
+  return (
+    <section className="px-5 py-14 sm:px-8">
+      <div className="theme-adaptive-soft mx-auto max-w-7xl overflow-hidden rounded-[2rem] border border-white/70 p-5 shadow-sm sm:p-7 lg:p-8">
+        <div className="grid gap-8 lg:grid-cols-[0.82fr_1.18fr] lg:items-center">
+          <div>
+            <StatusPill tone="cyan">Product walkthrough</StatusPill>
+            <h2 className="mt-4 text-3xl font-semibold leading-tight text-slate-950 sm:text-4xl">See QueryCite in 60 seconds</h2>
+            <p className="mt-4 text-base leading-7 text-slate-600">A quick walkthrough of how QueryCite scans your website, finds AI visibility gaps, and gives copy-paste AEO/GEO fixes.</p>
+            <div className="mt-6 grid gap-3 text-sm font-semibold text-slate-700 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+              {['Scan website', 'Find gaps', 'Apply fixes'].map((item) => (
+                <div key={item} className="qc-surface rounded-2xl border border-slate-200 bg-white/85 p-3 shadow-sm">{item}</div>
+              ))}
+            </div>
+          </div>
+
+          <div className="qc-surface overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white p-3 shadow-[0_24px_70px_rgba(15,23,42,0.12)]">
+            <div className="relative aspect-video overflow-hidden rounded-[1.35rem] bg-slate-950">
+              {isPlaying ? (
+                embedUrl ? (
+                  <iframe
+                    title="QueryCite explainer video"
+                    src={embedUrl}
+                    className="absolute inset-0 size-full"
+                    loading="lazy"
+                    allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allowFullScreen
+                  />
+                ) : (
+                  <video
+                    src={videoUrl}
+                    controls
+                    playsInline
+                    preload="metadata"
+                    className="absolute inset-0 size-full bg-slate-950 object-cover"
+                  />
+                )
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsPlaying(true)}
+                  className="group absolute inset-0 grid size-full place-items-center overflow-hidden text-left focus:outline-none focus:ring-4 focus:ring-violet-200"
+                  aria-label="Play QueryCite explainer video"
+                >
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(124,58,237,0.36),transparent_26%),radial-gradient(circle_at_82%_18%,rgba(6,182,212,0.28),transparent_30%),linear-gradient(135deg,#0f172a,#312e81_55%,#0f766e)]" />
+                  <div className="relative grid w-full max-w-xl gap-4 px-5 sm:px-8">
+                    <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/20 bg-white/12 p-4 text-white shadow-2xl backdrop-blur">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-100">AI Visibility Audit</p>
+                        <p className="mt-1 text-2xl font-semibold leading-tight">URL to scores to fixes</p>
+                      </div>
+                      <span className="grid size-14 shrink-0 place-items-center rounded-full bg-white text-slate-950 shadow-lg transition group-hover:scale-105" aria-hidden="true">
+                        <span className="ml-1 block h-0 w-0 border-y-[9px] border-l-[14px] border-y-transparent border-l-slate-950" />
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-3 text-center text-xs font-semibold text-white/90">
+                      <span className="rounded-2xl border border-white/20 bg-white/12 p-3 backdrop-blur">Scan</span>
+                      <span className="rounded-2xl border border-white/20 bg-white/12 p-3 backdrop-blur">Advisor</span>
+                      <span className="rounded-2xl border border-white/20 bg-white/12 p-3 backdrop-blur">Fix pack</span>
+                    </div>
+                  </div>
+                </button>
+              )}
+            </div>
+            <p className="px-2 pt-3 text-xs font-semibold leading-5 text-slate-500">Click to play. Video loads only after interaction.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
 function ReportPreview({ report }: { report: WebsiteAuditReport }) {
   return (
     <section id="report-preview" className="mx-auto w-full max-w-7xl px-5 py-10 sm:px-8">
@@ -358,6 +472,7 @@ export function HomeExperience() {
   const [report, setReport] = useState<WebsiteAuditReport | null>(null);
   const [canShowReport, setCanShowReport] = useState(false);
   const [isLeadGateOpen, setIsLeadGateOpen] = useState(false);
+  const explainerVideoUrl = getExplainerVideoUrl();
 
   useEffect(() => {
     if (scanState !== "scanning") return;
@@ -511,6 +626,8 @@ export function HomeExperience() {
           </div>
         </div>
       </section>
+
+      {explainerVideoUrl ? <ExplainerVideoSection videoUrl={explainerVideoUrl} /> : null}
 
       {scanState === "scanning" ? <section className="mx-auto w-full max-w-7xl px-5 py-10 sm:px-8"><ScanState progress={progress} /></section> : null}
       {isLeadGateOpen && report ? <LeadCaptureModal report={report} onSuccess={handleLeadSuccess} /> : null}
