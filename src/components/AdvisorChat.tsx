@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { AdvisorMarkdown } from "@/components/AdvisorMarkdown";
+import { FeedbackCta } from "@/components/FeedbackCta";
 import { StatusPill } from "@/components/ui";
 import { advisorActionCosts, planLimits, type AdvisorActionType, type PaidPlanName } from "@/lib/plans";
 
@@ -406,6 +407,8 @@ export function AdvisorChat({ currentReportData, companyProfile, competitorData,
         </div>
         <p className={`text-xs font-semibold ${remainingCharacters < 80 ? "text-amber-700" : "text-slate-500"}`}>{remainingCharacters} characters remaining</p>
       </form>
+
+      <FeedbackCta variant="inline" className="mt-4" />
 
       <p className="mt-4 text-xs font-semibold leading-5 text-slate-500">
         Recommendations improve AI visibility readiness; they do not guarantee citations, rankings, traffic, revenue, or search positions.

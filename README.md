@@ -56,6 +56,7 @@ Add these in Vercel Project Settings > Environment Variables for Production and 
 - `EMAIL_REPLY_TO`
 - `ADMIN_NOTIFICATION_EMAIL`
 - `NEXT_PUBLIC_APP_URL`
+- `NEXT_PUBLIC_FEEDBACK_FORM_URL` (optional Google Form URL for beta feedback CTA)
 
 Never expose `SUPABASE_SERVICE_ROLE_KEY` in client components or browser code.
 
@@ -111,6 +112,12 @@ Authenticated users are mapped to `profiles`, previous lead/report rows by match
 - Limited/free PDF download and CSV findings export work on the report page; share report and email report remain labelled preview/coming soon.
 - Dashboard, profile, billing, and saved report history require login. Free saved report links still open limited reports without login.
 - Razorpay subscription code is retained for later, while pricing currently uses one-time Test Mode orders until recurring billing is approved.
+
+## Beta Feedback Form
+
+Set `NEXT_PUBLIC_FEEDBACK_FORM_URL` to the public Google Form URL when the beta feedback form is ready. If this variable is missing or still set to `YOUR_GOOGLE_FORM_LINK_HERE`, the in-app feedback CTA is hidden so users never see a broken link.
+
+The suggested Google Form questions and an optional Apps Script generator are documented in `docs/querycite-beta-feedback-form.md`.
 
 ## AI Visibility Advisor
 

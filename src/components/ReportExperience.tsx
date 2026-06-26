@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { AdvisorChat } from "@/components/AdvisorChat";
+import { FeedbackCta } from "@/components/FeedbackCta";
 import { ClayCard, LockedPanel, ScoreRing, SectionHeader, StatusPill } from "@/components/ui";
 import { PriorityMatrix, ReadinessSnapshot } from "@/components/ReportVisuals";
 import { auditStorageKey, isWebsiteAuditReport, type AuditFinding, type ScoreName, type WebsiteAuditReport } from "@/lib/audit-report";
@@ -259,9 +260,7 @@ function BetaBanner() {
             Full report sections are temporarily unlocked for private feedback. Scores, recommendations, and workflows are being validated before paid launch.
           </p>
         </div>
-        <Link href="/contact" className="inline-flex min-h-11 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(15,23,42,0.18)] transition hover:-translate-y-0.5 hover:bg-slate-800">
-          Share Feedback
-        </Link>
+        <FeedbackCta />
       </div>
     </div>
   );
@@ -754,6 +753,7 @@ export function ReportExperience({ isFullDemo, reportId, subscriptionId, hasVeri
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {scoreCards(report).slice(1).map(([label, , value, tone]) => <ScoreRing key={label} label={label} score={value} tone={tone} />)}
         </div>
+        {!isFullDemo ? <FeedbackCta variant="card" className="mt-6" /> : null}
       </section>
       <section className="mx-auto max-w-7xl">
         <ReadinessSnapshot report={report} schemaReadiness={schemaReadiness} />

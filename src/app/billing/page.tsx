@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { DashboardShell, WorkspaceHeader } from "@/components/DashboardShell";
+import { FeedbackCta } from "@/components/FeedbackCta";
 import { AppCard, EmptyState, MetricCard, StatusPill } from "@/components/ui";
 import { formatPaise, getPaidAccessContextForUser, getPaymentHistoryForUser, isPaidPaymentRecord } from "@/lib/paid-foundation";
 import { requireAuthenticatedUser, syncAuthenticatedUser } from "@/lib/auth/server";
@@ -58,6 +59,7 @@ export default async function BillingPage() {
             <Link href="/billing/invoices" target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center justify-center rounded-full border border-violet-300 bg-violet-50 px-5 text-sm font-semibold text-violet-900">View invoices & receipts</Link>
             <Link href="/contact" className="inline-flex min-h-11 items-center justify-center rounded-full border border-slate-300 bg-white px-5 text-sm font-semibold text-slate-900">Contact support</Link>
           </div>
+          <FeedbackCta variant="card" className="mt-5" />
         </AppCard>
 
         <AppCard className="p-6">

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AdvisorChat } from "@/components/AdvisorChat";
 import { DashboardShell, WorkspaceHeader } from "@/components/DashboardShell";
+import { FeedbackCta } from "@/components/FeedbackCta";
 import { AppCard, EmptyState, LockedPanel, MetricCard, PrimaryLink, StatusPill } from "@/components/ui";
 import { getAdvisorResetDate, getPaidAccessContextForUser, getReportsForAuthenticatedUser } from "@/lib/paid-foundation";
 import { requireAuthenticatedUser, syncAuthenticatedUser } from "@/lib/auth/server";
@@ -49,6 +50,8 @@ export default async function DashboardPage() {
         <MetricCard label="Advisor credits" value={hasWorkspaceAccess ? access.limits.advisorCredits : 0} detail={hasWorkspaceAccess ? "Available per billing period" : "Unlock with full access"} tone="cyan" />
         <MetricCard label="Competitor updates" value={hasWorkspaceAccess ? access.limits.competitorChanges : "Locked"} detail="Available this period" tone="amber" />
       </section>
+
+      <FeedbackCta variant="card" />
 
       {access.isExpiredBetaAccess ? (
         <AppCard className="border-amber-200 bg-amber-50 p-5">
