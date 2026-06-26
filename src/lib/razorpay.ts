@@ -8,6 +8,7 @@ export type RazorpaySubscriptionInput = {
   email?: string;
   websiteUrl?: string;
   companyName?: string;
+  userId?: string;
 };
 
 export type RazorpayOrderInput = RazorpaySubscriptionInput & {
@@ -120,6 +121,9 @@ export async function createRazorpaySubscription(input: RazorpaySubscriptionInpu
         plan_name: input.plan,
         website_url: input.websiteUrl || "",
         company_name: input.companyName || "",
+        user_email: input.email || "",
+        email: input.email || "",
+        user_id: input.userId || "",
         source: "querycite_pricing",
       },
     }),

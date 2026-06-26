@@ -15,6 +15,8 @@ type CreateOrderRequest = {
   company_name?: string;
 };
 
+const loginRequiredMessage = "Please create an account or log in before payment so we can activate your access.";
+
 function compactText(value: unknown) {
   return typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
 }
@@ -29,7 +31,10 @@ export async function POST(request: Request) {
     }
 
     const user = await getCurrentUser();
-    if (user) await syncAuthenticatedUser(user);
+    if (!user) {
+      return NextResponse.json({ error: loginRequiredMessage, code: "login_required" }, { status: 401 });
+    }
+    await syncAuthenticatedUser(user);
 
     const websiteUrlInput = compactText(body.website_url);
     const websiteUrl = websiteUrlInput ? normalizeWebsiteUrl(websiteUrlInput) : undefined;
@@ -38,8 +43,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Please enter a valid website, for example byldgroup.com" }, { status: 400 });
     }
 
-    const suppliedEmail = compactText(body.email).toLowerCase();
-    const checkoutEmail = user?.email || suppliedEmail || undefined;
+    const checkoutEmail = user.email;
     const couponCodeInput = compactText(body.coupon_code);
     let amount = getOneTimeOrderAmount(plan);
     let couponCode: string | undefined;
@@ -48,8 +52,8 @@ export async function POST(request: Request) {
       const coupon = await validateIimaCouponForCheckout({
         code: couponCodeInput,
         selectedPlan: plan,
-        userId: user?.id ?? null,
-        email: checkoutEmail ?? null,
+        userId: user.id,
+        email: checkoutEmail,
       });
 
       if (!coupon.valid) {
@@ -68,8 +72,8 @@ export async function POST(request: Request) {
       couponType: couponCode ? "iima_beta" : undefined,
       paymentType: "one_time_beta",
       accessDurationDays: IIMA_BETA_ACCESS_DAYS,
-      userId: user?.id,
-      name: compactText(body.name) || user?.name || undefined,
+      userId: user.id,
+      name: compactText(body.name) || user.name || undefined,
       email: checkoutEmail,
       websiteUrl: websiteUrl || undefined,
       companyName: compactText(body.company_name) || undefined,

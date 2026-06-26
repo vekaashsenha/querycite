@@ -7,6 +7,7 @@ import { StatusPill } from "@/components/ui";
 type IimaBetaOfferProps = {
   name?: string;
   email?: string;
+  isAuthenticated?: boolean;
 };
 
 type CouponResponse = {
@@ -21,6 +22,46 @@ type CouponResponse = {
 const couponError = "This coupon is invalid, expired, already used, or fully redeemed.";
 const iimaBetaPriceLabel = "\u20B9199";
 const defaultSuccessMessage = `IIMA beta offer applied. Final amount: ${iimaBetaPriceLabel}. Access valid for 1 month.`;
+const loginRequiredMessage = "Please create an account or log in before payment so we can activate your access.";
+const couponDraftStorageKey = "querycite_iima_coupon_draft";
+const couponDraftMaxAgeMs = 7 * 24 * 60 * 60 * 1000;
+
+function normalizeCouponDraft(value: string) {
+  return value.toUpperCase().replace(/[^A-Z0-9-]/g, "").slice(0, 40);
+}
+
+function readCouponDraft() {
+  if (typeof window === "undefined") return "";
+
+  try {
+    const rawDraft = window.localStorage.getItem(couponDraftStorageKey);
+    if (!rawDraft) return "";
+    const draft = JSON.parse(rawDraft) as { code?: unknown; savedAt?: unknown };
+    const savedAt = typeof draft.savedAt === "number" ? draft.savedAt : 0;
+    if (!savedAt || Date.now() - savedAt > couponDraftMaxAgeMs) {
+      window.localStorage.removeItem(couponDraftStorageKey);
+      return "";
+    }
+    return typeof draft.code === "string" ? normalizeCouponDraft(draft.code) : "";
+  } catch {
+    return "";
+  }
+}
+
+function saveCouponDraft(value: string) {
+  if (typeof window === "undefined") return;
+  const code = normalizeCouponDraft(value);
+
+  try {
+    if (!code) {
+      window.localStorage.removeItem(couponDraftStorageKey);
+      return;
+    }
+    window.localStorage.setItem(couponDraftStorageKey, JSON.stringify({ code, savedAt: Date.now() }));
+  } catch {
+    // Ignore storage failures so coupon validation still works.
+  }
+}
 
 function formatCouponAmount(amountPaise?: number) {
   const amount = typeof amountPaise === "number" && Number.isFinite(amountPaise) ? amountPaise : 19900;
@@ -31,12 +72,13 @@ function formatCouponAmount(amountPaise?: number) {
   });
 }
 
-export function IimaBetaOffer({ name, email }: IimaBetaOfferProps) {
-  const [couponCode, setCouponCode] = useState("");
+export function IimaBetaOffer({ name, email, isAuthenticated = false }: IimaBetaOfferProps) {
+  const [couponCode, setCouponCode] = useState(() => readCouponDraft());
   const [appliedCode, setAppliedCode] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [isValidating, setIsValidating] = useState(false);
+
 
   async function applyCoupon(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -58,8 +100,9 @@ export function IimaBetaOffer({ name, email }: IimaBetaOfferProps) {
       }
 
       const amountDisplay = formatCouponAmount(data.final_amount_paise);
+      const successMessage = data.message || `IIMA beta offer applied. Final amount: ${amountDisplay}. Access valid for 1 month.`;
       setAppliedCode(data.code);
-      setMessage(data.message || `IIMA beta offer applied. Final amount: ${amountDisplay}. Access valid for 1 month.`);
+      setMessage(isAuthenticated ? successMessage : `${successMessage} ${loginRequiredMessage}`);
     } catch (couponValidationError) {
       setError(couponValidationError instanceof Error ? couponValidationError.message : couponError);
     } finally {
@@ -95,7 +138,9 @@ export function IimaBetaOffer({ name, email }: IimaBetaOfferProps) {
                 type="text"
                 value={couponCode}
                 onChange={(event) => {
-                  setCouponCode(event.target.value.toUpperCase());
+                  const nextCode = normalizeCouponDraft(event.target.value);
+                  setCouponCode(nextCode);
+                  saveCouponDraft(nextCode);
                   setMessage("");
                   setError("");
                   setAppliedCode("");
@@ -125,6 +170,7 @@ export function IimaBetaOffer({ name, email }: IimaBetaOfferProps) {
                 email={email}
                 buttonLabel={`Pay ${iimaBetaPriceLabel}`}
                 helperText={message || defaultSuccessMessage}
+                isAuthenticated={isAuthenticated}
               />
             </div>
           ) : null}

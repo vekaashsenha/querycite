@@ -1,5 +1,6 @@
-﻿"use client";
+"use client";
 
+import Link from "next/link";
 import { useState } from "react";
 
 type RazorpayPlan = "starter" | "pro" | "agency";
@@ -18,6 +19,7 @@ type CheckoutResponse = {
     email?: string;
   };
   error?: string;
+  code?: string;
 };
 
 type RazorpayCheckoutButtonProps = {
@@ -32,6 +34,7 @@ type RazorpayCheckoutButtonProps = {
   websiteUrl?: string;
   companyName?: string;
   className?: string;
+  isAuthenticated?: boolean;
 };
 
 type RazorpayInstance = {
@@ -60,6 +63,7 @@ declare global {
 }
 
 let razorpayScriptPromise: Promise<void> | null = null;
+const loginRequiredMessage = "Please create an account or log in before payment so we can activate your access.";
 
 function loadRazorpayScript() {
   if (typeof window === "undefined") return Promise.reject(new Error("Checkout is not available on the server."));
@@ -90,16 +94,26 @@ export function RazorpayCheckoutButton({
   websiteUrl,
   companyName,
   className = "",
+  isAuthenticated = true,
 }: RazorpayCheckoutButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [requiresLogin, setRequiresLogin] = useState(false);
   const isOrderMode = mode === "order";
   const defaultButtonLabel = isOrderMode ? "Start Beta" : "Start Checkout";
   const defaultHelperText = isOrderMode ? "You will be charged in INR through Razorpay." : "Payment flow is currently available for private validation.";
 
   async function startCheckout() {
-    setIsLoading(true);
     setError("");
+    setRequiresLogin(false);
+
+    if (!isAuthenticated) {
+      setRequiresLogin(true);
+      setError(loginRequiredMessage);
+      return;
+    }
+
+    setIsLoading(true);
 
     try {
       const endpoint = isOrderMode ? "/api/razorpay/create-order" : "/api/razorpay/create-subscription";
@@ -117,6 +131,12 @@ export function RazorpayCheckoutButton({
       });
       const data = (await response.json()) as CheckoutResponse;
       const checkoutId = isOrderMode ? data.order_id : data.subscription_id;
+
+      if (response.status === 401 || data.code === "login_required") {
+        setRequiresLogin(true);
+        setError(data.error || loginRequiredMessage);
+        return;
+      }
 
       if (!response.ok || !checkoutId) {
         throw new Error(data.error || "Razorpay payment is temporarily unavailable.");
@@ -174,7 +194,17 @@ export function RazorpayCheckoutButton({
       <p className="text-xs font-semibold leading-5 text-slate-500">
         {helperText || defaultHelperText}
       </p>
-      {error ? <p className="rounded-2xl border border-amber-100 bg-amber-50 p-3 text-xs font-semibold leading-5 text-amber-900">{error}</p> : null}
+      {requiresLogin ? (
+        <div className="rounded-2xl border border-cyan-100 bg-cyan-50 p-3 text-xs font-semibold leading-5 text-slate-900" aria-live="polite">
+          <p>{error || loginRequiredMessage}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link href="/signup?next=/pricing" className="rounded-full bg-slate-950 px-4 py-2 text-white transition hover:bg-slate-800">Create account</Link>
+            <Link href="/login?next=/pricing" className="rounded-full border border-slate-300 bg-white px-4 py-2 text-slate-900 transition hover:border-slate-500">Log in</Link>
+          </div>
+        </div>
+      ) : error ? (
+        <p className="rounded-2xl border border-amber-100 bg-amber-50 p-3 text-xs font-semibold leading-5 text-amber-900" aria-live="polite">{error}</p>
+      ) : null}
     </div>
   );
 }

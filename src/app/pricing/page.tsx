@@ -78,6 +78,7 @@ const comparisonRows = [
 
 export default async function PricingPage() {
   const user = await getCurrentUser();
+  const isAuthenticated = Boolean(user);
 
   return (
     <main className="px-5 py-16 sm:px-8">
@@ -115,6 +116,7 @@ export default async function PricingPage() {
                 mode="order"
                 name={user?.name ?? undefined}
                 email={user?.email}
+                isAuthenticated={isAuthenticated}
                 buttonLabel={plan.cta}
                 helperText="Billed in supported currency at checkout. Access begins after payment confirmation."
               />
@@ -144,7 +146,7 @@ export default async function PricingPage() {
         </div>
       </section>
 
-      <IimaBetaOffer name={user?.name ?? undefined} email={user?.email} />
+      <IimaBetaOffer name={user?.name ?? undefined} email={user?.email} isAuthenticated={isAuthenticated} />
 
       <section className="mx-auto mt-8 grid max-w-6xl gap-4 md:grid-cols-3">
         {[

@@ -188,7 +188,8 @@ async function getCoupon(code: string) {
 }
 
 async function couponAllowsCapturedAccess(code: string | null, userId: string | null, email: string | null, paymentId: string | null) {
-  if (!code) return true;
+  if (!code) return Boolean(userId);
+  if (!userId) return false;
   if (!isSupabaseAdminConfigured() || !isIimaBetaCouponCode(code)) return false;
 
   const redemptions = await getIimaCouponRedemptions();
@@ -223,6 +224,7 @@ async function recordCouponRedemption(payload: JsonRecord, eventName: string) {
 
   const userId = userIdFrom(subscription, payment);
   const email = emailFrom(subscription, payment);
+  if (!userId) return;
   const redemptions = await getIimaCouponRedemptions();
   if (userAlreadyRedeemedIimaCoupon(redemptions, userId, email)) return;
   if (countSuccessfulIimaRedemptions(redemptions) >= IIMA_BETA_CAMPAIGN_CAPACITY) return;
@@ -289,19 +291,20 @@ async function upsertSubscription(payload: JsonRecord, eventName: string) {
     const userId = userIdFrom(subscription, payment);
     const email = emailFrom(subscription, payment);
     const captured = eventName === "payment.captured";
+    const hasAccountOwner = Boolean(userId);
     const existing = await selectSupabaseRows<StoredSubscription>("subscriptions", {
       select: "id,razorpay_order_id,current_period_start,current_period_end,access_starts_at,access_ends_at",
       razorpay_order_id: `eq.${orderId}`,
       limit: "1",
     });
-    const couponAllows = captured ? await couponAllowsCapturedAccess(couponCode, userId, email, paymentId) : false;
+    const couponAllows = captured && hasAccountOwner ? await couponAllowsCapturedAccess(couponCode, userId, email, paymentId) : false;
     const existingStartsAt = existing[0]?.access_starts_at ?? existing[0]?.current_period_start ?? null;
     const existingEndsAt = existing[0]?.access_ends_at ?? existing[0]?.current_period_end ?? null;
     const existingWindow = existingStartsAt && existingEndsAt ? { startsAt: existingStartsAt, endsAt: existingEndsAt } : null;
     const accessWindow = captured && couponAllows
       ? existingWindow ?? await protectedOneTimeAccessWindow(payload, subscription, payment, orderId, userId, email)
       : { startsAt: null, endsAt: null };
-    const status = eventName === "payment.failed" ? "failed" : captured && couponAllows ? "active" : couponCode ? "coupon_invalid" : "pending";
+    const status = eventName === "payment.failed" ? "failed" : !hasAccountOwner ? "unassigned" : captured && couponAllows ? "active" : couponCode ? "coupon_invalid" : "pending";
 
     const row = {
       user_id: userId,

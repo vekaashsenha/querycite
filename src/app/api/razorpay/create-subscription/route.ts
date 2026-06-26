@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getCurrentUser, syncAuthenticatedUser } from "@/lib/auth/server";
 import { createRazorpaySubscription, isRazorpayPlanName } from "@/lib/razorpay";
 import { normalizeWebsiteUrl } from "@/lib/url";
 
@@ -11,6 +12,8 @@ type CreateSubscriptionRequest = {
   website_url?: string;
   company_name?: string;
 };
+
+const loginRequiredMessage = "Please create an account or log in before payment so we can activate your access.";
 
 function compactText(value: unknown) {
   return typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
@@ -25,6 +28,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Please select a valid QueryCite test plan." }, { status: 400 });
     }
 
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json({ error: loginRequiredMessage, code: "login_required" }, { status: 401 });
+    }
+    await syncAuthenticatedUser(user);
+
     const websiteUrlInput = compactText(body.website_url);
     const websiteUrl = websiteUrlInput ? normalizeWebsiteUrl(websiteUrlInput) : undefined;
 
@@ -34,8 +43,9 @@ export async function POST(request: Request) {
 
     const checkoutData = await createRazorpaySubscription({
       plan,
-      name: compactText(body.name) || undefined,
-      email: compactText(body.email).toLowerCase() || undefined,
+      name: compactText(body.name) || user.name || undefined,
+      email: user.email,
+      userId: user.id,
       websiteUrl: websiteUrl || undefined,
       companyName: compactText(body.company_name) || undefined,
     });
