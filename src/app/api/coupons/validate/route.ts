@@ -1,6 +1,6 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
-import { IIMA_BETA_COUPON_ERROR, validateIimaCouponForCheckout } from "@/lib/coupons";
+import { IIMA_BETA_COUPON_ERROR, IIMA_BETA_SUCCESS_MESSAGE, validateIimaCouponForCheckout } from "@/lib/coupons";
 
 export const runtime = "nodejs";
 
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
     });
 
     if (!result.valid) {
-      return NextResponse.json({ error: IIMA_BETA_COUPON_ERROR }, { status: 400 });
+      return NextResponse.json({ error: result.error, reason: result.reason }, { status: 400 });
     }
 
     return NextResponse.json({
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
       code: result.code,
       final_amount_paise: result.finalAmountPaise,
       currency: result.currency,
-      message: "IIMA beta offer applied. Final amount: ₹199. Access valid for 1 month.",
+      message: IIMA_BETA_SUCCESS_MESSAGE,
     });
   } catch (error) {
     console.error("Coupon validation failed", error);

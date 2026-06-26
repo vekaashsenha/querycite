@@ -1,4 +1,4 @@
-﻿import crypto from "node:crypto";
+import crypto from "node:crypto";
 
 export type RazorpayPlanName = "starter" | "pro" | "agency";
 
@@ -13,7 +13,7 @@ export type RazorpaySubscriptionInput = {
 export type RazorpayOrderInput = RazorpaySubscriptionInput & {
   amount?: number;
   couponCode?: string;
-  couponFinalAmount?: number;
+  couponFinalAmountPaise?: number;
   couponType?: string;
   paymentType?: "one_time_beta" | "one_time_test";
   userId?: string;
@@ -165,7 +165,7 @@ export async function createRazorpayOrder(input: RazorpayOrderInput): Promise<Ra
 
   if (couponCode) {
     notes.coupon_code = couponCode;
-    notes.coupon_final_amount = String(input.couponFinalAmount ?? amount);
+    notes.coupon_final_amount_paise = String(input.couponFinalAmountPaise ?? amount);
     notes.coupon_type = input.couponType || "iima_beta";
   }
 

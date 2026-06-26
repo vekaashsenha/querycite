@@ -1,5 +1,13 @@
-﻿import { NextResponse } from "next/server";
-import { betaAccessWindow, normalizeCouponCode } from "@/lib/coupons";
+import { NextResponse } from "next/server";
+import {
+  countSuccessfulIimaRedemptions,
+  getIimaCouponRedemptions,
+  IIMA_BETA_CAMPAIGN_CAPACITY,
+  isIimaBetaCouponCode,
+  isSuccessfulCouponRedemptionStatus,
+  normalizeCouponCode,
+  userAlreadyRedeemedIimaCoupon,
+} from "@/lib/coupons";
 import { getAdminNotificationEmail } from "@/lib/email/resend";
 import { paymentFailedUserTemplate, paymentSuccessUserTemplate, subscriptionActiveUserTemplate, subscriptionStatusChangedUserTemplate } from "@/lib/email/templates";
 import { sendTransactionalEmail } from "@/lib/email/sendTransactionalEmail";
@@ -31,7 +39,6 @@ type CouponCodeRow = {
   id?: string;
   code?: string;
   redeemed_count?: number | null;
-  max_redemptions?: number | null;
   is_active?: boolean | null;
   expires_at?: string | null;
 };
@@ -110,44 +117,13 @@ function couponCodeFrom(subscription: JsonRecord, payment: JsonRecord) {
   return code ? normalizeCouponCode(code) : null;
 }
 
-function cleanEmail(value: string | null | undefined) {
-  return value ? value.trim().toLowerCase() : "";
-}
-
-function isCapturedStatus(status: string | null | undefined) {
-  return status === "captured" || status === "active" || status === "paid_beta_active";
-}
-
 function couponExpired(expiresAt: string | null | undefined) {
   return Boolean(expiresAt && Date.parse(expiresAt) <= Date.now());
-}
-
-function couponFullyRedeemed(coupon: CouponCodeRow) {
-  return (coupon.redeemed_count ?? 0) >= (coupon.max_redemptions ?? 50);
-}
-
-function redemptionMatchesUser(redemption: CouponRedemptionRow, userId: string | null, email: string | null) {
-  if (!isCapturedStatus(redemption.status)) return false;
-  if (userId && redemption.user_id === userId) return true;
-  if (email && cleanEmail(redemption.email) === cleanEmail(email)) return true;
-  return false;
 }
 
 function capturedAtFrom(payload: JsonRecord, payment: JsonRecord) {
   const iso = unixSecondsToIso(payment.created_at) || unixSecondsToIso(payload.created_at);
   return iso ? new Date(iso) : new Date();
-}
-
-function accessWindowFrom(payload: JsonRecord, subscription: JsonRecord, payment: JsonRecord) {
-  const capturedAt = capturedAtFrom(payload, payment);
-  const days = Number(noteText(subscription, payment, "access_duration_days") || 30);
-  const window = betaAccessWindow(capturedAt);
-  if (Number.isFinite(days) && days > 0 && days !== 30) {
-    const ends = new Date(capturedAt);
-    ends.setDate(ends.getDate() + days);
-    return { startsAt: capturedAt.toISOString(), endsAt: ends.toISOString() };
-  }
-  return window;
 }
 
 function accessWindowForDuration(startsAt: Date, days: number) {
@@ -204,31 +180,25 @@ function currentPeriodAllowsAccess(currentPeriodEnd: string | null) {
 
 async function getCoupon(code: string) {
   const rows = await selectSupabaseRows<CouponCodeRow>("coupon_codes", {
-    select: "id,code,redeemed_count,max_redemptions,is_active,expires_at",
+    select: "id,code,redeemed_count,is_active,expires_at",
     code: `eq.${code}`,
     limit: "1",
   });
   return rows[0] ?? null;
 }
 
-async function getCouponRedemptions(code: string) {
-  return await selectSupabaseRows<CouponRedemptionRow>("coupon_redemptions", {
-    select: "id,user_id,email,razorpay_payment_id,status",
-    code: `eq.${code}`,
-    limit: "200",
-  });
-}
-
 async function couponAllowsCapturedAccess(code: string | null, userId: string | null, email: string | null, paymentId: string | null) {
   if (!code) return true;
-  if (!isSupabaseAdminConfigured()) return false;
+  if (!isSupabaseAdminConfigured() || !isIimaBetaCouponCode(code)) return false;
+
+  const redemptions = await getIimaCouponRedemptions();
+  if (paymentId && redemptions.some((redemption) => redemption.razorpay_payment_id === paymentId && isSuccessfulCouponRedemptionStatus(redemption.status))) return true;
 
   const coupon = await getCoupon(code);
-  if (!coupon?.id || coupon.is_active === false || couponExpired(coupon.expires_at) || couponFullyRedeemed(coupon)) return false;
+  if (!coupon?.id || coupon.is_active !== true || couponExpired(coupon.expires_at)) return false;
+  if (userAlreadyRedeemedIimaCoupon(redemptions, userId, email)) return false;
 
-  const redemptions = await getCouponRedemptions(code);
-  if (paymentId && redemptions.some((redemption) => redemption.razorpay_payment_id === paymentId && isCapturedStatus(redemption.status))) return true;
-  return !redemptions.some((redemption) => redemptionMatchesUser(redemption, userId, email));
+  return countSuccessfulIimaRedemptions(redemptions) < IIMA_BETA_CAMPAIGN_CAPACITY;
 }
 
 async function recordCouponRedemption(payload: JsonRecord, eventName: string) {
@@ -239,7 +209,7 @@ async function recordCouponRedemption(payload: JsonRecord, eventName: string) {
   const code = couponCodeFrom(subscription, payment);
   const paymentId = text(payment.id);
   const orderId = text(payment.order_id);
-  if (!code || !paymentId) return;
+  if (!code || !paymentId || !isIimaBetaCouponCode(code)) return;
 
   const existing = await selectSupabaseRows<CouponRedemptionRow>("coupon_redemptions", {
     select: "id",
@@ -249,12 +219,13 @@ async function recordCouponRedemption(payload: JsonRecord, eventName: string) {
   if (existing[0]?.id) return;
 
   const coupon = await getCoupon(code);
-  if (!coupon?.id || coupon.is_active === false || couponExpired(coupon.expires_at) || couponFullyRedeemed(coupon)) return;
+  if (!coupon?.id || coupon.is_active !== true || couponExpired(coupon.expires_at)) return;
 
   const userId = userIdFrom(subscription, payment);
   const email = emailFrom(subscription, payment);
-  const redemptions = await getCouponRedemptions(code);
-  if (redemptions.some((redemption) => redemptionMatchesUser(redemption, userId, email))) return;
+  const redemptions = await getIimaCouponRedemptions();
+  if (userAlreadyRedeemedIimaCoupon(redemptions, userId, email)) return;
+  if (countSuccessfulIimaRedemptions(redemptions) >= IIMA_BETA_CAMPAIGN_CAPACITY) return;
 
   const amount = numberValue(payment.amount) ?? 0;
   const capturedAt = capturedAtFrom(payload, payment).toISOString();
@@ -430,7 +401,7 @@ async function upsertPayment(payload: JsonRecord, eventName: string, subscriptio
   const paymentType = paymentTypeFrom(subscription, payment);
   const captured = eventName === "payment.captured";
   const accessWindow = paymentType === "one_time_beta" && captured
-    ? await storedAccessWindow(subscriptionRowId) ?? accessWindowFrom(payload, subscription, payment)
+    ? await storedAccessWindow(subscriptionRowId) ?? { startsAt: null, endsAt: null }
     : { startsAt: null, endsAt: null };
   const row = {
     user_id: userIdFrom(subscription, payment),
@@ -486,8 +457,10 @@ async function sendWebhookEmails(payload: JsonRecord, eventName: string, subscri
   const paymentId = text(payment.id);
   const orderId = text(payment.order_id);
   const paymentType = paymentTypeFrom(subscription, payment);
-  const accessWindow = paymentType === "one_time_beta" && eventName === "payment.captured" ? accessWindowFrom(payload, subscription, payment) : { startsAt: null, endsAt: null };
-  const hasFullReportAccess = paymentType === "one_time_beta" && eventName === "payment.captured" ? true : paymentType !== "one_time_test" && Boolean(subscriptionId);
+  const accessWindow = paymentType === "one_time_beta" && eventName === "payment.captured"
+    ? await storedAccessWindow(subscriptionRowId) ?? { startsAt: null, endsAt: null }
+    : { startsAt: null, endsAt: null };
+  const hasFullReportAccess = paymentType === "one_time_beta" && eventName === "payment.captured" ? Boolean(accessWindow.endsAt) : paymentType !== "one_time_test" && Boolean(subscriptionId);
   const amount = numberValue(payment.amount);
   const data = {
     email: recipient,

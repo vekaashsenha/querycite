@@ -1,4 +1,4 @@
-﻿-- QueryCite Supabase schema for private beta backend foundation.
+-- QueryCite Supabase schema for private beta backend foundation.
 -- Run this in the Supabase SQL Editor for the project connected to QueryCite.
 
 create extension if not exists pgcrypto;
@@ -342,13 +342,15 @@ create table if not exists public.coupon_codes (
   description text,
   final_amount_paise integer not null,
   currency text default 'INR',
-  max_redemptions integer default 50,
+  max_redemptions integer default 100,
   redeemed_count integer default 0,
   is_active boolean default true,
   expires_at timestamptz,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
+
+alter table public.coupon_codes alter column max_redemptions set default 100;
 
 create table if not exists public.coupon_redemptions (
   id uuid primary key default gen_random_uuid(),
@@ -367,8 +369,8 @@ create table if not exists public.coupon_redemptions (
 
 insert into public.coupon_codes (code, description, final_amount_paise, currency, max_redemptions, is_active)
 values
-  ('IIMA-AGMP18', 'Exclusive IIMA Beta Offer: ₹199 for 1-month paid beta access', 19900, 'INR', 50, true),
-  ('IIMA-DMBPT02', 'Exclusive IIMA Beta Offer: ₹199 for 1-month paid beta access', 19900, 'INR', 50, true)
+  ('IIMA-AGMP18', U&'Exclusive IIMA Beta Offer: \20B9199 for 1-month paid beta access', 19900, 'INR', 100, true),
+  ('IIMA-DMBPT02', U&'Exclusive IIMA Beta Offer: \20B9199 for 1-month paid beta access', 19900, 'INR', 100, true)
 on conflict (code) do update set
   description = excluded.description,
   final_amount_paise = excluded.final_amount_paise,

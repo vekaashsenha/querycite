@@ -19,7 +19,17 @@ type CouponResponse = {
 };
 
 const couponError = "This coupon is invalid, expired, already used, or fully redeemed.";
-const successMessage = "IIMA beta offer applied. Final amount: ₹199. Access valid for 1 month.";
+const iimaBetaPriceLabel = "\u20B9199";
+const defaultSuccessMessage = `IIMA beta offer applied. Final amount: ${iimaBetaPriceLabel}. Access valid for 1 month.`;
+
+function formatCouponAmount(amountPaise?: number) {
+  const amount = typeof amountPaise === "number" && Number.isFinite(amountPaise) ? amountPaise : 19900;
+  return (amount / 100).toLocaleString("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: amount % 100 === 0 ? 0 : 2,
+  });
+}
 
 export function IimaBetaOffer({ name, email }: IimaBetaOfferProps) {
   const [couponCode, setCouponCode] = useState("");
@@ -44,13 +54,14 @@ export function IimaBetaOffer({ name, email }: IimaBetaOfferProps) {
       const data = (await response.json()) as CouponResponse;
 
       if (!response.ok || !data.valid || !data.code) {
-        throw new Error(couponError);
+        throw new Error(data.error || couponError);
       }
 
+      const amountDisplay = formatCouponAmount(data.final_amount_paise);
       setAppliedCode(data.code);
-      setMessage(successMessage);
-    } catch {
-      setError(couponError);
+      setMessage(data.message || `IIMA beta offer applied. Final amount: ${amountDisplay}. Access valid for 1 month.`);
+    } catch (couponValidationError) {
+      setError(couponValidationError instanceof Error ? couponValidationError.message : couponError);
     } finally {
       setIsValidating(false);
     }
@@ -64,10 +75,10 @@ export function IimaBetaOffer({ name, email }: IimaBetaOfferProps) {
           <h2 className="mt-4 text-2xl font-semibold text-slate-950">Exclusive IIMA Beta Offer</h2>
           <p className="mt-2 text-sm font-semibold text-slate-700">For AGMP18 and DMBPT02 cohort members</p>
           <div className="mt-5 flex flex-wrap items-end gap-3">
-            <p className="text-3xl font-semibold text-slate-950">₹199</p>
+            <p className="text-3xl font-semibold text-slate-950">{iimaBetaPriceLabel}</p>
             <p className="pb-1 text-sm font-semibold text-slate-500">$2 equivalent</p>
           </div>
-          <p className="mt-2 text-sm font-semibold text-slate-950">Pay ₹199 for 1-month paid beta access</p>
+          <p className="mt-2 text-sm font-semibold text-slate-950">Pay {iimaBetaPriceLabel} for 1-month paid beta access</p>
           <div className="mt-5 grid grid-cols-3 gap-2 text-center text-xs font-semibold text-slate-700">
             {["Full report", "AI Advisor", "1 month"].map((item) => (
               <div key={item} className="qc-surface rounded-2xl border border-white/80 bg-white p-3 shadow-sm">{item}</div>
@@ -94,7 +105,7 @@ export function IimaBetaOffer({ name, email }: IimaBetaOfferProps) {
                 className="qc-input min-h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-800 outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
               />
               <button type="submit" disabled={isValidating || couponCode.trim().length === 0} className="min-h-12 rounded-2xl bg-slate-950 px-5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300">
-                {isValidating ? "Applying…" : "Apply"}
+                {isValidating ? "Applying..." : "Apply"}
               </button>
             </div>
           </form>
@@ -112,8 +123,8 @@ export function IimaBetaOffer({ name, email }: IimaBetaOfferProps) {
                 couponCode={appliedCode}
                 name={name}
                 email={email}
-                buttonLabel="Pay ₹199"
-                helperText={successMessage}
+                buttonLabel={`Pay ${iimaBetaPriceLabel}`}
+                helperText={message || defaultSuccessMessage}
               />
             </div>
           ) : null}

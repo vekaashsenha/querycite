@@ -1,6 +1,6 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getCurrentUser, syncAuthenticatedUser } from "@/lib/auth/server";
-import { IIMA_BETA_ACCESS_DAYS, IIMA_BETA_COUPON_ERROR, validateIimaCouponForCheckout } from "@/lib/coupons";
+import { IIMA_BETA_ACCESS_DAYS, validateIimaCouponForCheckout } from "@/lib/coupons";
 import { createRazorpayOrder, getOneTimeOrderAmount, isRazorpayPlanName } from "@/lib/razorpay";
 import { normalizeWebsiteUrl } from "@/lib/url";
 
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
       });
 
       if (!coupon.valid) {
-        return NextResponse.json({ error: IIMA_BETA_COUPON_ERROR }, { status: 400 });
+        return NextResponse.json({ error: coupon.error, reason: coupon.reason }, { status: 400 });
       }
 
       amount = coupon.finalAmountPaise;
@@ -64,7 +64,7 @@ export async function POST(request: Request) {
       plan,
       amount,
       couponCode,
-      couponFinalAmount: couponCode ? amount : undefined,
+      couponFinalAmountPaise: couponCode ? amount : undefined,
       couponType: couponCode ? "iima_beta" : undefined,
       paymentType: "one_time_beta",
       accessDurationDays: IIMA_BETA_ACCESS_DAYS,
