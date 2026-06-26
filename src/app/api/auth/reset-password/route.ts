@@ -15,7 +15,7 @@ export async function POST(request: Request) {
     const password = typeof body.password === "string" ? body.password : "";
 
     if (!accessToken) {
-      return NextResponse.json({ error: "Reset link is invalid or expired. Please request a new password reset link." }, { status: 400 });
+      return NextResponse.json({ error: "This password reset link has expired or was already used. Please request a new one." }, { status: 400 });
     }
 
     if (password.length < 8) {
@@ -31,3 +31,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }
+

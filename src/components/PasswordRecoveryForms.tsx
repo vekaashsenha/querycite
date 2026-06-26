@@ -1,13 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { FormEvent, Suspense, useEffect, useState } from "react";
 import { AppCard, StatusPill } from "@/components/ui";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 const forgotSuccess = "If an account exists for this email, we have sent a password reset link.";
-const resetSuccess = "Your password has been updated. Please login again.";
+const resetSuccess = "Password updated. Please log in again.";
+const expiredResetLinkMessage = "This password reset link has expired or was already used. Please request a new one.";
 const inputClass = "min-h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100";
+
+type ResetStatus = "checking" | "ready" | "invalid" | "success";
 
 function PageShell({ eyebrow, title, description, children }: { eyebrow: string; title: string; description: string; children: React.ReactNode }) {
   return (
@@ -31,6 +35,12 @@ function PageShell({ eyebrow, title, description, children }: { eyebrow: string;
   );
 }
 
+function passwordResetRedirectUrl() {
+  const configuredAppUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");
+  const appUrl = configuredAppUrl || (typeof window !== "undefined" ? window.location.origin : "");
+  return `${appUrl}/reset-password`;
+}
+
 export function ForgotPasswordForm() {
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
@@ -44,14 +54,18 @@ export function ForgotPasswordForm() {
     setIsLoading(true);
 
     try {
-      const response = await fetch("/api/auth/forgot-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+      const supabase = getSupabaseBrowserClient();
+      if (!supabase) throw new Error("Password reset is temporarily unavailable.");
+
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+        redirectTo: passwordResetRedirectUrl(),
       });
-      const data = await response.json() as { error?: string; message?: string };
-      if (!response.ok) throw new Error(data.error || "Password reset is temporarily unavailable.");
-      setSuccess(data.message || forgotSuccess);
+
+      if (resetError) {
+        console.error("Password reset email request failed", resetError);
+      }
+
+      setSuccess(forgotSuccess);
     } catch (forgotError) {
       setError(forgotError instanceof Error ? forgotError.message : "Password reset is temporarily unavailable.");
     } finally {
@@ -86,34 +100,92 @@ export function ForgotPasswordForm() {
   );
 }
 
+function getTokenParams(searchParams: URLSearchParams) {
+  const hash = typeof window !== "undefined" ? new URLSearchParams(window.location.hash.replace(/^#/, "")) : new URLSearchParams();
+  return {
+    accessToken: hash.get("access_token") || searchParams.get("access_token") || "",
+    code: searchParams.get("code") || hash.get("code") || "",
+    queryError: searchParams.get("error_description") || searchParams.get("error") || hash.get("error_description") || hash.get("error") || "",
+    refreshToken: hash.get("refresh_token") || searchParams.get("refresh_token") || "",
+    tokenHash: searchParams.get("token_hash") || hash.get("token_hash") || searchParams.get("token") || hash.get("token") || "",
+  };
+}
+
+function cleanResetUrl() {
+  if (typeof window !== "undefined") {
+    window.history.replaceState(null, "", "/reset-password");
+  }
+}
+
 function ResetPasswordInner() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState(searchParams.get("updated") === "true" ? resetSuccess : "");
+  const [success, setSuccess] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-
-  const resetLink = useMemo(() => {
-    const queryError = searchParams.get("error_description") || searchParams.get("error") || "";
-    if (queryError) return { accessToken: "", error: queryError };
-    if (typeof window === "undefined") return { accessToken: "", error: "" };
-
-    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
-    const accessToken = hash.get("access_token") || searchParams.get("access_token") || "";
-    return {
-      accessToken,
-      error: accessToken ? "" : "Reset link is invalid or expired. Please request a new password reset link.",
-    };
-  }, [searchParams]);
-  const accessToken = resetLink.accessToken;
-  const visibleError = error || (success ? "" : resetLink.error);
+  const [status, setStatus] = useState<ResetStatus>("checking");
 
   useEffect(() => {
-    if (accessToken && typeof window !== "undefined" && window.location.hash) {
-      window.history.replaceState(null, "", "/reset-password");
+    let isCancelled = false;
+
+    async function verifyResetLink() {
+      const supabase = getSupabaseBrowserClient();
+      if (!supabase) {
+        if (!isCancelled) {
+          setError("Password reset is temporarily unavailable.");
+          setStatus("invalid");
+        }
+        return;
+      }
+
+      setError("");
+      setStatus("checking");
+
+      try {
+        const params = getTokenParams(searchParams);
+        if (params.queryError) throw new Error(params.queryError);
+
+        if (params.code) {
+          const { error: codeError } = await supabase.auth.exchangeCodeForSession(params.code);
+          if (codeError) throw codeError;
+        } else if (params.accessToken && params.refreshToken) {
+          const { error: sessionError } = await supabase.auth.setSession({
+            access_token: params.accessToken,
+            refresh_token: params.refreshToken,
+          });
+          if (sessionError) throw sessionError;
+        } else if (params.tokenHash) {
+          const { error: otpError } = await supabase.auth.verifyOtp({
+            token_hash: params.tokenHash,
+            type: "recovery",
+          });
+          if (otpError) throw otpError;
+        } else {
+          const { data } = await supabase.auth.getSession();
+          if (!data.session) throw new Error("No recovery session found.");
+        }
+
+        if (!isCancelled) {
+          cleanResetUrl();
+          setStatus("ready");
+        }
+      } catch (verifyError) {
+        console.error("Password reset link verification failed", verifyError);
+        if (!isCancelled) {
+          setError(expiredResetLinkMessage);
+          setStatus("invalid");
+        }
+      }
     }
-  }, [accessToken]);
+
+    void verifyResetLink();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [searchParams]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -130,24 +202,29 @@ function ResetPasswordInner() {
       return;
     }
 
-    if (!accessToken) {
-      setError("Reset link is invalid or expired. Please request a new password reset link.");
+    if (status !== "ready") {
+      setError(expiredResetLinkMessage);
       return;
     }
 
     setIsLoading(true);
     try {
-      const response = await fetch("/api/auth/reset-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ access_token: accessToken, password: newPassword }),
-      });
-      const data = await response.json() as { error?: string; message?: string };
-      if (!response.ok) throw new Error(data.error || "Password could not be updated. Please request a new reset link.");
-      setSuccess(data.message || resetSuccess);
+      const supabase = getSupabaseBrowserClient();
+      if (!supabase) throw new Error("Password reset is temporarily unavailable.");
+
+      const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+      if (updateError) throw updateError;
+
+      await supabase.auth.signOut().catch(() => null);
+      await fetch("/api/auth/logout?next=/login", { method: "POST" }).catch(() => null);
+
+      setStatus("success");
+      setSuccess(resetSuccess);
       setNewPassword("");
       setConfirmPassword("");
+      window.setTimeout(() => router.replace("/login?reset=success"), 1200);
     } catch (resetError) {
+      console.error("Password update failed", resetError);
       setError(resetError instanceof Error ? resetError.message : "Password could not be updated. Please request a new reset link.");
     } finally {
       setIsLoading(false);
@@ -161,33 +238,62 @@ function ResetPasswordInner() {
           <h2 className="text-2xl font-semibold text-slate-950">New password</h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">Use at least 8 characters.</p>
         </div>
-        <StatusPill tone="green">Recovery</StatusPill>
+        <StatusPill tone={status === "invalid" ? "amber" : "green"}>Recovery</StatusPill>
       </div>
-      <form onSubmit={submit} className="mt-7 grid gap-4">
-        <label className="grid gap-2 text-sm font-semibold text-slate-700">
-          New password
-          <input value={newPassword} onChange={(event) => setNewPassword(event.target.value)} type="password" autoComplete="new-password" className={inputClass} />
-        </label>
-        <label className="grid gap-2 text-sm font-semibold text-slate-700">
-          Confirm new password
-          <input value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} type="password" autoComplete="new-password" className={inputClass} />
-        </label>
-        {visibleError ? <p className="rounded-2xl border border-rose-100 bg-rose-50 p-4 text-sm font-semibold leading-6 text-rose-700">{visibleError}</p> : null}
-        {success ? <p className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm font-semibold leading-6 text-emerald-800">{success}</p> : null}
-        <button type="submit" disabled={isLoading || !accessToken || Boolean(success)} className="min-h-12 rounded-full bg-slate-950 px-6 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(15,23,42,0.16)] transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400">
-          {isLoading ? "Updating password..." : "Update password"}
-        </button>
-      </form>
-      <p className="mt-6 rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm leading-6 text-slate-600">
-        {success ? <Link href="/login" className="font-semibold text-violet-700">Go to login</Link> : <Link href="/forgot-password" className="font-semibold text-violet-700">Request a new reset link</Link>}
-      </p>
+
+      {status === "checking" ? (
+        <div className="mt-7 rounded-2xl border border-violet-100 bg-violet-50 p-4 text-sm font-semibold leading-6 text-violet-900" aria-live="polite">
+          Verifying reset link...
+        </div>
+      ) : null}
+
+      {status === "invalid" ? (
+        <div className="mt-7 grid gap-4">
+          <p className="rounded-2xl border border-rose-100 bg-rose-50 p-4 text-sm font-semibold leading-6 text-rose-700">{error || expiredResetLinkMessage}</p>
+          <Link href="/forgot-password" className="inline-flex min-h-12 items-center justify-center rounded-full bg-slate-950 px-6 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(15,23,42,0.16)] transition hover:-translate-y-0.5 hover:bg-slate-800">
+            Request new reset link
+          </Link>
+        </div>
+      ) : null}
+
+      {status === "ready" ? (
+        <form onSubmit={submit} className="mt-7 grid gap-4">
+          <label className="grid gap-2 text-sm font-semibold text-slate-700">
+            New password
+            <input value={newPassword} onChange={(event) => setNewPassword(event.target.value)} type="password" autoComplete="new-password" className={inputClass} />
+          </label>
+          <label className="grid gap-2 text-sm font-semibold text-slate-700">
+            Confirm new password
+            <input value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} type="password" autoComplete="new-password" className={inputClass} />
+          </label>
+          {error ? <p className="rounded-2xl border border-rose-100 bg-rose-50 p-4 text-sm font-semibold leading-6 text-rose-700">{error}</p> : null}
+          <button type="submit" disabled={isLoading} className="min-h-12 rounded-full bg-slate-950 px-6 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(15,23,42,0.16)] transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400">
+            {isLoading ? "Updating password..." : "Update password"}
+          </button>
+        </form>
+      ) : null}
+
+      {status === "success" ? (
+        <div className="mt-7 grid gap-4">
+          <p className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm font-semibold leading-6 text-emerald-800">{success || resetSuccess}</p>
+          <Link href="/login" className="inline-flex min-h-12 items-center justify-center rounded-full bg-slate-950 px-6 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(15,23,42,0.16)] transition hover:-translate-y-0.5 hover:bg-slate-800">
+            Go to login
+          </Link>
+        </div>
+      ) : null}
+
+      {status !== "invalid" ? (
+        <p className="mt-6 rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm leading-6 text-slate-600">
+          Need a fresh link? <Link href="/forgot-password" className="font-semibold text-violet-700">Request a new reset link</Link>.
+        </p>
+      ) : null}
     </PageShell>
   );
 }
 
 export function ResetPasswordForm() {
   return (
-    <Suspense fallback={<main className="px-5 py-16 sm:px-8"><AppCard className="mx-auto max-w-xl text-center"><StatusPill tone="violet">Loading</StatusPill><p className="mt-4 text-sm font-semibold text-slate-600">Preparing password reset...</p></AppCard></main>}>
+    <Suspense fallback={<main className="px-5 py-16 sm:px-8"><AppCard className="mx-auto max-w-xl text-center"><StatusPill tone="violet">Loading</StatusPill><p className="mt-4 text-sm font-semibold text-slate-600">Verifying reset link...</p></AppCard></main>}>
       <ResetPasswordInner />
     </Suspense>
   );
