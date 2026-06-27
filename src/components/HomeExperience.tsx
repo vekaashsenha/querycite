@@ -297,16 +297,18 @@ function FeatureClusterPanel({ cluster }: { cluster: (typeof featureClusters)[nu
   );
 }
 const explainerVideoPlaceholder = "QUERYCITE_EXPLAINER_VIDEO_URL";
+const defaultExplainerVideoUrl = "/videos/querycite-explainer-motion.mp4";
+const defaultExplainerThumbnailUrl = "/videos/querycite-explainer-thumbnail.png";
 
 function getExplainerVideoUrl() {
   const value = process.env.NEXT_PUBLIC_EXPLAINER_VIDEO_URL?.trim();
-  if (!value || value === explainerVideoPlaceholder) return "";
+  if (!value || value === explainerVideoPlaceholder) return defaultExplainerVideoUrl;
 
   try {
     const url = new URL(value);
-    return url.protocol === "https:" || url.protocol === "http:" ? value : "";
+    return url.protocol === "https:" || url.protocol === "http:" ? value : defaultExplainerVideoUrl;
   } catch {
-    return "";
+    return defaultExplainerVideoUrl;
   }
 }
 
@@ -336,8 +338,10 @@ function getEmbeddedVideoUrl(videoUrl: string) {
   return "";
 }
 
-function ExplainerVideoSection({ videoUrl }: { videoUrl: string }) {
+function ExplainerVideoSection({ videoUrl, thumbnailUrl = defaultExplainerThumbnailUrl }: { videoUrl: string; thumbnailUrl?: string }) {
   const [isPlaying, setIsPlaying] = useState(false);
+  const [hasVideoError, setHasVideoError] = useState(false);
+  const [hasThumbnailError, setHasThumbnailError] = useState(false);
   const embedUrl = getEmbeddedVideoUrl(videoUrl);
 
   return (
@@ -357,7 +361,14 @@ function ExplainerVideoSection({ videoUrl }: { videoUrl: string }) {
 
           <div className="qc-surface overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white p-3 shadow-[0_24px_70px_rgba(15,23,42,0.12)]">
             <div className="relative aspect-video overflow-hidden rounded-[1.35rem] bg-slate-950">
-              {isPlaying ? (
+              {hasVideoError ? (
+                <div className="absolute inset-0 grid place-items-center bg-slate-950 px-6 text-center text-white">
+                  <div>
+                    <p className="text-lg font-semibold">Video preview is unavailable right now.</p>
+                    <p className="mt-2 text-sm leading-6 text-slate-300">You can still run a free audit and view the product walkthrough later.</p>
+                  </div>
+                </div>
+              ) : isPlaying ? (
                 embedUrl ? (
                   <iframe
                     title="QueryCite explainer video"
@@ -370,9 +381,11 @@ function ExplainerVideoSection({ videoUrl }: { videoUrl: string }) {
                 ) : (
                   <video
                     src={videoUrl}
+                    poster={thumbnailUrl}
                     controls
                     playsInline
                     preload="metadata"
+                    onError={() => setHasVideoError(true)}
                     className="absolute inset-0 size-full bg-slate-950 object-cover"
                   />
                 )
@@ -383,7 +396,18 @@ function ExplainerVideoSection({ videoUrl }: { videoUrl: string }) {
                   className="group absolute inset-0 grid size-full place-items-center overflow-hidden text-left focus:outline-none focus:ring-4 focus:ring-violet-200"
                   aria-label="Play QueryCite explainer video"
                 >
-                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(124,58,237,0.36),transparent_26%),radial-gradient(circle_at_82%_18%,rgba(6,182,212,0.28),transparent_30%),linear-gradient(135deg,#0f172a,#312e81_55%,#0f766e)]" />
+                  {hasThumbnailError ? (
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(124,58,237,0.36),transparent_26%),radial-gradient(circle_at_82%_18%,rgba(6,182,212,0.28),transparent_30%),linear-gradient(135deg,#0f172a,#312e81_55%,#0f766e)]" />
+                  ) : (
+                    <img
+                      src={thumbnailUrl}
+                      alt=""
+                      aria-hidden="true"
+                      onError={() => setHasThumbnailError(true)}
+                      className="absolute inset-0 size-full object-cover"
+                    />
+                  )}
+                  <div className="absolute inset-0 bg-slate-950/30" />
                   <div className="relative grid w-full max-w-xl gap-4 px-5 sm:px-8">
                     <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/20 bg-white/12 p-4 text-white shadow-2xl backdrop-blur">
                       <div>
