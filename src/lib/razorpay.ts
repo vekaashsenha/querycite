@@ -59,6 +59,27 @@ const oneTimeOrderPrices: Record<RazorpayPlanName, number> = {
   agency: 999900,
 };
 
+
+export type RazorpayKeyMode = "test" | "live" | "missing";
+
+function razorpayKeyMode(value: string | undefined): RazorpayKeyMode {
+  const key = value?.trim() || "";
+  if (key.startsWith("rzp_live_")) return "live";
+  if (key.startsWith("rzp_test_")) return "test";
+  return "missing";
+}
+
+export function getRazorpaySafeDiagnostics() {
+  const publicKeyMode = razorpayKeyMode(process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID);
+  const serverKeyMode = process.env.RAZORPAY_KEY_SECRET ? publicKeyMode : "missing";
+
+  return {
+    publicKeyMode,
+    serverKeyMode,
+    webhookSecretConfigured: Boolean(process.env.RAZORPAY_WEBHOOK_SECRET),
+  };
+}
+
 export function isRazorpayPlanName(value: unknown): value is RazorpayPlanName {
   return value === "starter" || value === "pro" || value === "agency";
 }
