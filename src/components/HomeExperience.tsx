@@ -8,8 +8,8 @@ import { normalizeWebsiteUrl, urlErrorMessage } from "@/lib/url";
 import { DoodleConnector, FeatureClusterVisual, WorkflowDoodle } from "@/components/DoodleVisuals";
 import { ClayCard, LockedPanel, PrimaryLink, ScoreRing, SectionHeader, StatusPill } from "@/components/ui";
 
-const scanSteps = ["Fetching homepage", "Checking crawler and llms.txt signals", "Scoring AEO/GEO readiness", "Preparing fix-ready report"];
-const valueItems = ["AI Crawler Readiness", "Schema & Content Clarity", "Competitor Gaps", "Ready-to-Paste Fixes", "AI Visibility Advisor"];
+const scanSteps = ["Scanning website", "Checking AI visibility signals", "Reviewing brand and content gaps", "Preparing report"];
+const valueItems = ["Brand clarity", "Content gaps", "Trust signals", "Ready-to-use fixes", "Advisor guidance"];
 const problemCards = [
   ["AI search cannot explain you clearly", "Weak entity signals make it harder for AI systems to identify what your brand does and who it serves."],
   ["Pages are not answer-ready", "Useful content often lacks concise answers, FAQs, proof points, and structure that AI can summarize."],
@@ -33,7 +33,7 @@ const featureClusters: Array<{
     eyebrow: "Audit & Scores",
     title: "See the signals AI systems can read",
     summary: "One scan turns technical and content signals into a clear readiness baseline.",
-    bullets: ["AI Visibility, AEO, and GEO scores", "AI crawler readiness and access checks"],
+    bullets: ["AI Visibility, AEO, and GEO scores", "Crawler and access checks"],
     wide: true,
     className: "border-violet-200 bg-violet-50/70",
   },
@@ -42,7 +42,7 @@ const featureClusters: Array<{
     eyebrow: "Insight & Recommendations",
     title: "Move from issue to implementation",
     summary: "Each gap is translated into a practical action for the team that owns it.",
-    bullets: ["llms.txt and content guidance", "Ready-to-paste Fix Pack and developer notes"],
+    bullets: ["llms.txt and content guidance", "Ready-to-paste fixes and developer notes"],
     wide: false,
     className: "border-amber-200 bg-amber-50/70",
   },
@@ -168,7 +168,7 @@ function LeadCaptureModal({ report, onSuccess }: { report: WebsiteAuditReport; o
       <div className="w-full max-w-2xl rounded-[2rem] border border-white/80 bg-white p-6 shadow-2xl shadow-slate-950/25 sm:p-8">
         <StatusPill tone="violet">Free report access</StatusPill>
         <h2 className="mt-4 text-3xl font-semibold leading-tight text-slate-950">Get your free AI Visibility Report</h2>
-        <p className="mt-3 text-sm leading-6 text-slate-600">Enter your details to view your website-based AEO/GEO readiness report. We will use your information to share your report and relevant QueryCite updates.</p>
+        <p className="mt-3 text-sm leading-6 text-slate-600">Enter your details to view your website-based AI visibility report. We will use your information to share your report and relevant QueryCite updates.</p>
         <p className="mt-3 rounded-2xl border border-slate-100 bg-slate-50 p-3 text-xs font-semibold leading-5 text-slate-600">Scanned website: {report.finalUrl}</p>
 
         <form onSubmit={submitLead} className="mt-6 grid gap-4">
@@ -219,8 +219,8 @@ function ScanState({ progress }: { progress: number }) {
       <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <StatusPill>Scan in progress</StatusPill>
-          <h2 className="mt-4 text-2xl font-semibold leading-tight text-slate-950">Preparing your AI Visibility Audit</h2>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600">Fetching the website and checking content, crawler access, llms.txt, trust, schema, and answer-readiness signals.</p>
+          <h2 className="mt-4 text-2xl font-semibold leading-tight text-slate-950">Preparing your AI visibility report</h2>
+          <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600">Checking your website, content, trust signals, and places where AI search may need clearer context.</p>
         </div>
         <div className="text-5xl font-semibold leading-none text-violet-700">{progress}%</div>
       </div>
@@ -245,13 +245,13 @@ function HeroPreview() {
       <ClayCard className="relative overflow-hidden bg-white/90 p-5">
         <div className="flex items-center justify-between gap-4 border-b border-slate-100 pb-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Website-based audit</p>
-            <h2 className="mt-1 text-lg font-semibold text-slate-950">AI search readiness signals</h2>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Website scan</p>
+            <h2 className="mt-1 text-lg font-semibold text-slate-950">What AI search can understand</h2>
           </div>
           <StatusPill tone="green">Real checks</StatusPill>
         </div>
         <div className="mt-5 grid gap-3">
-          {["Homepage fetch and final URL", "Title, metadata, headings, schema", "AI crawler and robots.txt signals", "llms.txt, trust, FAQ, and internal links"].map((item) => (
+          {["What your brand does", "Which pages explain your offer", "Where trust signals are unclear", "What to fix first"].map((item) => (
             <div key={item} className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm font-semibold leading-6 text-slate-700">{item}</div>
           ))}
         </div>
@@ -351,7 +351,7 @@ function ExplainerVideoSection({ videoUrl, thumbnailUrl = defaultExplainerThumbn
           <div>
             <StatusPill tone="cyan">Product walkthrough</StatusPill>
             <h2 className="mt-4 text-3xl font-semibold leading-tight text-slate-950 sm:text-4xl">See QueryCite in 60 seconds</h2>
-            <p className="mt-4 text-base leading-7 text-slate-600">A quick walkthrough of how QueryCite scans your website, finds AI visibility gaps, and gives copy-paste AEO/GEO fixes.</p>
+            <p className="mt-4 text-base leading-7 text-slate-600">A quick walkthrough of how QueryCite scans your website, finds AI visibility gaps, and gives ready-to-use fixes.</p>
             <div className="mt-6 grid gap-3 text-sm font-semibold text-slate-700 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
               {['Scan website', 'Find gaps', 'Apply fixes'].map((item) => (
                 <div key={item} className="qc-surface rounded-2xl border border-slate-200 bg-white/85 p-3 shadow-sm">{item}</div>
@@ -411,8 +411,8 @@ function ExplainerVideoSection({ videoUrl, thumbnailUrl = defaultExplainerThumbn
                   <div className="relative grid w-full max-w-xl gap-4 px-5 sm:px-8">
                     <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/20 bg-white/12 p-4 text-white shadow-2xl backdrop-blur">
                       <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-100">AI Visibility Audit</p>
-                        <p className="mt-1 text-2xl font-semibold leading-tight">URL to scores to fixes</p>
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-100">Website scan</p>
+                        <p className="mt-1 text-2xl font-semibold leading-tight">URL to gaps to fixes</p>
                       </div>
                       <span className="grid size-14 shrink-0 place-items-center rounded-full bg-white text-slate-950 shadow-lg transition group-hover:scale-105" aria-hidden="true">
                         <span className="ml-1 block h-0 w-0 border-y-[9px] border-l-[14px] border-y-transparent border-l-slate-950" />
@@ -575,14 +575,14 @@ export function HomeExperience() {
         <div className="mx-auto grid w-full max-w-7xl gap-12 lg:grid-cols-[1fr_0.86fr] lg:items-center">
           <div>
             <h1 className="max-w-5xl text-5xl font-semibold leading-[1.02] tracking-normal text-slate-950 sm:text-6xl lg:text-7xl">
-              Find why AI search is not citing your brand, then get ready-to-use AEO/GEO fixes.
+              Your customers are asking AI. Is your brand showing up?
             </h1>
             <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-700">
-              Scan crawler access, entity clarity, schema, and answer coverage, then turn the gaps into practical fixes.
+              QueryCite scans your website to find why AI search may not understand, cite, or recommend your brand &mdash; then gives you ready-to-use fixes.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Link href="/#audit" className="inline-flex min-h-12 items-center justify-center rounded-full bg-slate-950 px-6 text-sm font-semibold text-white shadow-lg shadow-slate-950/10 transition hover:-translate-y-0.5 hover:bg-slate-800">Run Free AI Visibility Audit</Link>
-              <Link href="/report?demo=full" className="inline-flex min-h-12 items-center justify-center rounded-full border border-slate-300 bg-white px-6 text-sm font-semibold text-slate-900 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-950">View Sample Report</Link>
+              <Link href="/#audit" className="inline-flex min-h-12 items-center justify-center rounded-full bg-blue-600 px-6 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:-translate-y-0.5 hover:bg-blue-700">Scan your website free</Link>
+              <Link href="/#how-it-works" className="inline-flex min-h-12 items-center justify-center rounded-full border border-slate-300 bg-white px-6 text-sm font-semibold text-slate-900 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-700 hover:text-blue-800">See how it works</Link>
             </div>
             <div className="mt-6 flex flex-wrap gap-3">
               {valueItems.map((item) => <StatusPill key={item} tone="slate">{item}</StatusPill>)}
@@ -592,8 +592,8 @@ export function HomeExperience() {
 
           <div className="grid gap-5">
             <ClayCard className="bg-white/90">
-              <h2 className="text-2xl font-semibold leading-tight text-slate-950">Run a free AI visibility audit</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-600">Enter your website to start a website-based AI visibility readiness audit.</p>
+              <h2 className="text-2xl font-semibold leading-tight text-slate-950">Run a free website scan</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-600">Enter your website to see where AI search may need clearer signals about your brand.</p>
               <form onSubmit={runAudit} className="mt-6 grid gap-3" noValidate>
                 <label htmlFor="audit-url" className="text-sm font-semibold text-slate-700">Website URL</label>
                 <input
@@ -612,8 +612,8 @@ export function HomeExperience() {
                   className="min-h-14 rounded-2xl border border-slate-200 bg-white px-5 text-base outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
                 />
                 {urlError ? <p id="audit-url-error" className="text-sm font-semibold leading-5 text-rose-600">{urlError}</p> : null}
-                <button type="submit" disabled={scanState === "scanning"} className="min-h-14 rounded-2xl bg-slate-950 px-6 text-sm font-semibold text-white shadow-lg shadow-slate-950/15 transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400">
-                  {scanState === "scanning" ? "Running audit..." : "Run Free AI Visibility Audit"}
+                <button type="submit" disabled={scanState === "scanning"} className="min-h-14 rounded-2xl bg-blue-600 px-6 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:-translate-y-0.5 hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400">
+                  {scanState === "scanning" ? "Running scan..." : "Scan your website free"}
                 </button>
               </form>
             </ClayCard>
@@ -639,12 +639,12 @@ export function HomeExperience() {
       <section className="px-5 py-12 sm:px-8">
         <div className="theme-adaptive-soft mx-auto grid max-w-7xl gap-6 rounded-[2rem] border border-white/70 p-6 shadow-sm lg:grid-cols-[0.95fr_1.05fr] lg:items-center lg:p-8">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-700">Why QueryCite is different</p>
-            <h2 className="mt-3 text-3xl font-semibold leading-tight text-slate-950">Free checkers show your score. QueryCite turns the score into fixes.</h2>
-            <p className="mt-4 text-sm leading-6 text-slate-600">Move from a score to crawler, schema, content, and developer actions.</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">Why QueryCite is different</p>
+            <h2 className="mt-3 text-3xl font-semibold leading-tight text-slate-950">QueryCite does not just tell you what is wrong. It shows what to fix and where to use it.</h2>
+            <p className="mt-4 text-sm leading-6 text-slate-600">Turn unclear brand, content, and website signals into practical next steps your marketing and technical teams can use.</p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            {["Crawler readiness details", "llms.txt draft", "Ready-to-paste fixes", "Developer action notes"].map((item) => (
+            {["Plain-English gaps", "Copy-paste recommendations", "Developer notes", "Content ideas"].map((item) => (
               <div key={item} className="rounded-2xl border border-white/70 bg-white p-4 text-sm font-semibold text-slate-700 shadow-sm">{item}</div>
             ))}
           </div>
@@ -658,7 +658,7 @@ export function HomeExperience() {
       {scanState === "complete" && report && canShowReport ? <ReportPreview report={report} /> : null}
 
       <section id="product" className="px-5 py-16 sm:px-8">
-        <SectionHeader eyebrow="The problem" title="Brands are invisible when AI cannot explain them clearly" description="Weak entity, answer, proof, or schema signals create avoidable visibility gaps." />
+        <SectionHeader eyebrow="The problem" title="Brands are invisible when AI cannot explain them clearly" description="If your website does not clearly explain who you help, what you do, and why you are credible, AI search may miss important context." />
         <div className="mx-auto mt-10 grid max-w-7xl gap-5 md:grid-cols-3">
           {problemCards.map(([title, description]) => (
             <ClayCard key={title}>
@@ -670,14 +670,17 @@ export function HomeExperience() {
       </section>
 
       <section className="px-5 py-16 sm:px-8">
-        <SectionHeader eyebrow="What you get" title="One audit, four connected layers" description="Scores lead to insights, insights lead to action, and the output is ready to share." />
+        <SectionHeader eyebrow="What you get" title="One audit, four connected layers" description="A simple view of the gaps, the recommendations, and the outputs your team can use." />
         <div className="mx-auto mt-10 grid max-w-7xl gap-5 lg:grid-cols-12">
           {featureClusters.map((cluster) => <FeatureClusterPanel key={cluster.kind} cluster={cluster} />)}
         </div>
+        <p className="mx-auto mt-6 max-w-4xl rounded-3xl border border-slate-200 bg-white/85 p-5 text-center text-sm font-semibold leading-6 text-slate-700 shadow-sm">
+          For teams that already know the terms, QueryCite also checks AEO, GEO, schema, crawler readiness, and llms.txt signals.
+        </p>
       </section>
 
       <section id="how-it-works" className="px-5 py-16 sm:px-8">
-        <SectionHeader eyebrow="How it works" title="Three steps from URL to action" description="A connected workflow from website signals to implementation-ready fixes." />
+        <SectionHeader eyebrow="How QueryCite helps" title="From website scan to clear next steps" description="A simple workflow for finding what AI search may be missing and turning it into useful fixes." />
         <div className="relative mx-auto mt-10 max-w-7xl overflow-hidden rounded-[2rem] border border-slate-200 bg-white px-5 py-8 shadow-sm sm:px-8 lg:px-10">
           <div className="absolute inset-0 opacity-45 surface-grid" aria-hidden="true" />
           <div className="relative grid items-center gap-3 md:grid-cols-[1fr_auto_1fr_auto_1fr]">
@@ -687,7 +690,7 @@ export function HomeExperience() {
               </div>
               <div className="mx-auto mt-5 grid size-8 place-items-center rounded-full bg-violet-700 text-xs font-semibold text-white">01</div>
               <h3 className="mt-3 text-xl font-semibold text-slate-950">Scan your website</h3>
-              <p className="mx-auto mt-2 max-w-xs text-sm leading-6 text-slate-600">Enter a URL and collect crawler, schema, content, and entity signals.</p>
+              <p className="mx-auto mt-2 max-w-xs text-sm leading-6 text-slate-600">Enter your website URL and get a quick AI visibility audit.</p>
             </div>
 
             <div className="grid place-items-center">
@@ -700,8 +703,8 @@ export function HomeExperience() {
                 <WorkflowDoodle kind="scan" />
               </div>
               <div className="mx-auto mt-5 grid size-8 place-items-center rounded-full bg-cyan-700 text-xs font-semibold text-white">02</div>
-              <h3 className="mt-3 text-xl font-semibold text-slate-950">Find visibility gaps</h3>
-              <p className="mx-auto mt-2 max-w-xs text-sm leading-6 text-slate-600">Turn raw signals into scores, severity, and a clear order of priority.</p>
+              <h3 className="mt-3 text-xl font-semibold text-slate-950">Find what AI search may be missing</h3>
+              <p className="mx-auto mt-2 max-w-xs text-sm leading-6 text-slate-600">See where your brand, content, structure, and technical signals may be unclear.</p>
             </div>
 
             <div className="grid place-items-center">
@@ -714,13 +717,13 @@ export function HomeExperience() {
                 <WorkflowDoodle kind="fix" />
               </div>
               <div className="mx-auto mt-5 grid size-8 place-items-center rounded-full bg-emerald-700 text-xs font-semibold text-white">03</div>
-              <h3 className="mt-3 text-xl font-semibold text-slate-950">Apply AEO/GEO fixes</h3>
-              <p className="mx-auto mt-2 max-w-xs text-sm leading-6 text-slate-600">Give content and developer teams concrete, ready-to-review actions.</p>
+              <h3 className="mt-3 text-xl font-semibold text-slate-950">Get ready-to-use fixes</h3>
+              <p className="mx-auto mt-2 max-w-xs text-sm leading-6 text-slate-600">Use copy-paste recommendations, developer notes, and content ideas to improve your AI search readiness.</p>
             </div>
           </div>
 
           <div className="relative mx-auto mt-8 flex max-w-2xl flex-wrap items-center justify-center gap-2 text-xs font-semibold text-slate-600">
-            {['URL', 'Signals', 'Priorities', 'Fixes'].map((label, index) => (
+            {['Website URL', 'Missing context', 'Fix plan', 'Retest'].map((label, index) => (
               <div key={label} className="flex items-center gap-2">
                 {index > 0 ? <span className="text-slate-300" aria-hidden="true">&rarr;</span> : null}
                 <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 shadow-sm">{label}</span>
@@ -743,6 +746,19 @@ export function HomeExperience() {
         <div className="mt-8 text-center"><PrimaryLink href="/use-cases">View all use cases</PrimaryLink></div>
       </section>
 
+      <section className="px-5 py-14 sm:px-8">
+        <div className="mx-auto grid max-w-7xl gap-6 rounded-[2rem] border border-slate-200 bg-white/90 p-6 shadow-sm lg:grid-cols-[0.8fr_1.2fr] lg:items-center lg:p-8">
+          <div className="rounded-[1.5rem] border border-blue-100 bg-blue-50 p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">Founder-built</p>
+            <h2 className="mt-3 text-3xl font-semibold leading-tight text-slate-950">Built for marketers who do not have a full SEO or development team.</h2>
+          </div>
+          <div>
+            <p className="text-base leading-7 text-slate-700">QueryCite comes from 10+ years of hands-on marketing experience across digital campaigns, B2B growth, brand visibility, and performance marketing &mdash; built to make AI search readiness simple, practical, and fixable.</p>
+            <p className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-semibold leading-6 text-slate-700">Currently pursuing AGMP at IIM Ahmedabad.</p>
+          </div>
+        </div>
+      </section>
+
       <section className="px-5 py-16 sm:px-8">
         <div className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
           <div>
@@ -753,7 +769,7 @@ export function HomeExperience() {
           </div>
           <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
             <ClayCard><StatusPill tone="green">Free</StatusPill><h3 className="mt-4 text-xl font-semibold leading-7">$0</h3><p className="mt-2 text-sm text-slate-600">Limited audit and report</p></ClayCard>
-            <ClayCard><StatusPill>Starter</StatusPill><h3 className="mt-4 text-xl font-semibold leading-7">$20/month</h3><p className="mt-2 text-sm text-slate-600">For hands-on AEO/GEO fixes</p></ClayCard>
+            <ClayCard><StatusPill>Starter</StatusPill><h3 className="mt-4 text-xl font-semibold leading-7">$20/month</h3><p className="mt-2 text-sm text-slate-600">For hands-on visibility fixes</p></ClayCard>
             <ClayCard><StatusPill tone="cyan">Pro</StatusPill><h3 className="mt-4 text-xl font-semibold leading-7">$99/month</h3><p className="mt-2 text-sm text-slate-600">For ongoing team workflows</p></ClayCard>
           </div>
         </div>
@@ -786,10 +802,10 @@ export function HomeExperience() {
       </section>
 
       <section className="px-5 py-16 sm:px-8">
-        <div className="mx-auto max-w-7xl rounded-[2rem] bg-gradient-to-r from-slate-950 via-violet-950 to-teal-900 p-8 text-center text-white shadow-2xl shadow-slate-950/20 sm:p-12">
-          <h2 className="text-4xl font-semibold leading-tight">Run a free AI visibility audit</h2>
-          <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-violet-100">See how QueryCite frames scores, findings, locked sections, and ready-to-use AEO/GEO fixes.</p>
-          <div className="mt-8"><Link href="/#audit" className="inline-flex min-h-12 items-center justify-center rounded-full bg-white px-6 text-sm font-semibold text-slate-950">Start free audit</Link></div>
+        <div className="mx-auto max-w-7xl rounded-[2rem] border border-blue-100 bg-gradient-to-r from-blue-50 via-white to-teal-50 p-8 text-center shadow-xl shadow-blue-950/5 sm:p-12">
+          <h2 className="text-4xl font-semibold leading-tight text-slate-950">Scan your website free</h2>
+          <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-slate-600">Find what AI search may be missing and get clear, ready-to-use next steps.</p>
+          <div className="mt-8"><Link href="/#audit" className="inline-flex min-h-12 items-center justify-center rounded-full bg-blue-600 px-6 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:-translate-y-0.5 hover:bg-blue-700">Scan your website free</Link></div>
         </div>
       </section>
     </main>

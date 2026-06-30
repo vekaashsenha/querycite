@@ -115,7 +115,7 @@ export function AdminLivePaymentTestButton() {
         disabled={isLoading}
         className="inline-flex min-h-11 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(15,23,42,0.16)] transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
       >
-        {isLoading ? "Opening Razorpay..." : "Run ?1 live test"}
+        {isLoading ? "Opening Razorpay..." : "Run \u20b910 live test"}
       </button>
       <p className="text-xs font-semibold leading-5 text-slate-500">Temporary admin-only route. This does not use or consume IIMA coupons.</p>
       {error ? <p className="rounded-2xl border border-amber-100 bg-amber-50 p-3 text-xs font-semibold leading-5 text-amber-900" aria-live="polite">{error}</p> : null}

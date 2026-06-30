@@ -310,7 +310,7 @@ async function upsertSubscription(payload: JsonRecord, eventName: string) {
       limit: "1",
     });
     const couponAllows = !adminLiveTest && captured && hasAccountOwner ? await couponAllowsCapturedAccess(couponCode, userId, email, paymentId) : false;
-    const adminLiveTestAllows = adminLiveTest && captured && hasAccountOwner && amount === 100 && currency.toUpperCase() === "INR";
+    const adminLiveTestAllows = adminLiveTest && captured && hasAccountOwner && amount === 1000 && currency.toUpperCase() === "INR";
     const paidAccessAllowed = couponAllows || adminLiveTestAllows;
     const existingStartsAt = existing[0]?.access_starts_at ?? existing[0]?.current_period_start ?? null;
     const existingEndsAt = existing[0]?.access_ends_at ?? existing[0]?.current_period_end ?? null;

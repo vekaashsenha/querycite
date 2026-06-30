@@ -4,7 +4,7 @@ import { createRazorpayOrder } from "@/lib/razorpay";
 
 export const runtime = "nodejs";
 
-const adminLiveTestAmountPaise = 100;
+const adminLiveTestAmountPaise = 1000;
 const adminLiveTestValidityDays = 30;
 
 export async function POST() {

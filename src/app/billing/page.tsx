@@ -39,7 +39,7 @@ export default async function BillingPage() {
           <WorkspaceHeader
             eyebrow="Admin only"
             title="Admin Live Payment Test"
-            description="Pay ?1 to verify live Razorpay payment, webhook, access activation, invoice, and Starter feature unlock."
+            description={"Pay \u20b910 to verify live Razorpay payment, webhook, access activation, invoice, and Starter feature unlock."}
           />
           <div className="mt-5">
             <AdminLivePaymentTestButton />
