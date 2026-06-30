@@ -16,9 +16,10 @@ export type RazorpayOrderInput = RazorpaySubscriptionInput & {
   couponCode?: string;
   couponFinalAmountPaise?: number;
   couponType?: string;
-  paymentType?: "one_time_beta" | "one_time_test";
+  paymentType?: "one_time_beta" | "one_time_test" | "admin_live_test";
   userId?: string;
   accessDurationDays?: number;
+  extraNotes?: Record<string, string>;
 };
 
 export type RazorpaySubscriptionCheckoutData = {
@@ -74,7 +75,7 @@ function getRequiredEnv(name: string) {
 
 export function getRazorpayPublicKeyId() {
   const keyId = getRequiredEnv("NEXT_PUBLIC_RAZORPAY_KEY_ID");
-  if (!keyId.startsWith("rzp_test_")) {
+  if (!keyId.startsWith("rzp_test_") && !keyId.startsWith("rzp_live_")) {
     throw new Error("Razorpay payment configuration is required.");
   }
   return keyId;
@@ -172,6 +173,8 @@ export async function createRazorpayOrder(input: RazorpayOrderInput): Promise<Ra
     notes.coupon_final_amount_paise = String(input.couponFinalAmountPaise ?? amount);
     notes.coupon_type = input.couponType || "iima_beta";
   }
+
+  Object.assign(notes, input.extraNotes || {});
 
   const response = await fetch(`${razorpayApiBase}/orders`, {
     method: "POST",

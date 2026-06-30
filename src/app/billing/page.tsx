@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AdminLivePaymentTestButton } from "@/components/AdminLivePaymentTestButton";
 import { DashboardShell, WorkspaceHeader } from "@/components/DashboardShell";
 import { FeedbackCta } from "@/components/FeedbackCta";
 import { AppCard, EmptyState, MetricCard, StatusPill } from "@/components/ui";
@@ -32,6 +33,19 @@ export default async function BillingPage() {
         <MetricCard label="Amount paid" value={formatPaise(access.amountPaise, access.currency)} detail={access.couponCode ? "Cohort offer applied" : "Most recent payment"} tone="cyan" />
         <MetricCard label="Access active until" value={formatDate(access.accessEndsAt ?? access.currentPeriodEnd)} detail={access.isPaidBetaAccess || access.isExpiredBetaAccess ? "1-month access" : "Current access period"} tone="slate" />
       </section>
+
+      {access.isAdmin ? (
+        <AppCard className="border-cyan-200 bg-cyan-50/70 p-6">
+          <WorkspaceHeader
+            eyebrow="Admin only"
+            title="Admin Live Payment Test"
+            description="Pay ?1 to verify live Razorpay payment, webhook, access activation, invoice, and Starter feature unlock."
+          />
+          <div className="mt-5">
+            <AdminLivePaymentTestButton />
+          </div>
+        </AppCard>
+      ) : null}
 
       <section className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
         <AppCard className="p-6">
