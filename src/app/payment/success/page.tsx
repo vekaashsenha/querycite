@@ -1,4 +1,5 @@
 ﻿import Link from "next/link";
+import { PaymentSuccessCouponCleanup } from "@/components/PaymentSuccessCouponCleanup";
 import { ClayCard, PageIntro, PrimaryLink, StatusPill } from "@/components/ui";
 
 type PaymentSuccessPageProps = {
@@ -17,6 +18,7 @@ export default async function PaymentSuccessPage({ searchParams }: PaymentSucces
 
   return (
     <main className="px-5 py-16 sm:px-8">
+      <PaymentSuccessCouponCleanup />
       <PageIntro
         eyebrow="Payment received"
         title={isOrderPayment ? "Payment submitted for verification." : "Payment status submitted."}

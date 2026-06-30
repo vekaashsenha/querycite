@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { clearIimaCouponDraft } from "@/lib/coupon-storage";
 
 type RazorpayPlan = "starter" | "pro" | "agency";
 type RazorpayMode = "order" | "subscription";
@@ -162,6 +163,8 @@ export function RazorpayCheckoutButton({
         },
         theme: { color: "#0f172a" },
         handler: (checkoutResponse) => {
+          if (couponCode) clearIimaCouponDraft();
+
           if (isOrderMode) {
             const orderId = checkoutResponse.razorpay_order_id || data.order_id || checkoutId;
             window.location.href = `/payment/success?order_id=${encodeURIComponent(orderId)}`;

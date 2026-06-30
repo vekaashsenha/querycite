@@ -2,6 +2,7 @@ import { IimaBetaOffer } from "@/components/IimaBetaOffer";
 import { RazorpayCheckoutButton } from "@/components/RazorpayCheckoutButton";
 import { AppCard, PageIntro, PrimaryLink, StatusPill } from "@/components/ui";
 import { getCurrentUser } from "@/lib/auth/server";
+import { getPaidAccessContextForUser } from "@/lib/paid-foundation";
 
 const plans = [
   {
@@ -79,6 +80,9 @@ const comparisonRows = [
 export default async function PricingPage() {
   const user = await getCurrentUser();
   const isAuthenticated = Boolean(user);
+  const access = user ? await getPaidAccessContextForUser(user) : null;
+  const hasActivePaidAccess = Boolean(access?.verifiedPaidAccess);
+  const couponAlreadyUsed = Boolean(access?.isExpiredBetaAccess);
 
   return (
     <main className="px-5 py-16 sm:px-8">
@@ -146,7 +150,7 @@ export default async function PricingPage() {
         </div>
       </section>
 
-      <IimaBetaOffer name={user?.name ?? undefined} email={user?.email} isAuthenticated={isAuthenticated} />
+      <IimaBetaOffer name={user?.name ?? undefined} email={user?.email} isAuthenticated={isAuthenticated} hasActivePaidAccess={hasActivePaidAccess} couponAlreadyUsed={couponAlreadyUsed} />
 
       <section className="mx-auto mt-8 grid max-w-6xl gap-4 md:grid-cols-3">
         {[
