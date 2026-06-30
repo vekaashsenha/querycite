@@ -284,6 +284,230 @@ body {
   border-color: var(--qc-border) !important;
 }
 
+
+body:has(.marketing-home-light) {
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f8fbff 42%, #f6f7fb 100%),
+    #f8fafc !important;
+  color: #0f172a;
+}
+
+.marketing-home-light {
+  --qc-page: #f8fafc;
+  --qc-surface: #ffffff;
+  --qc-surface-muted: #f8fafc;
+  --qc-foreground: #0f172a;
+  --qc-muted: #475569;
+  --qc-border: #dbe3ef;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 16% 8%, rgba(37, 99, 235, 0.08), transparent 30%),
+    radial-gradient(circle at 84% 16%, rgba(20, 184, 166, 0.08), transparent 32%),
+    linear-gradient(180deg, #ffffff 0%, #f8fbff 46%, #f6f7fb 100%);
+  color: #0f172a;
+}
+
+.theme-dark .marketing-home-light {
+  background:
+    radial-gradient(circle at 16% 8%, rgba(37, 99, 235, 0.08), transparent 30%),
+    radial-gradient(circle at 84% 16%, rgba(20, 184, 166, 0.08), transparent 32%),
+    linear-gradient(180deg, #ffffff 0%, #f8fbff 46%, #f6f7fb 100%) !important;
+  color: #0f172a !important;
+}
+
+.theme-dark .marketing-home-light .surface-grid {
+  background-image:
+    linear-gradient(rgba(15, 23, 42, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15, 23, 42, 0.045) 1px, transparent 1px) !important;
+}
+
+.theme-dark .marketing-home-light .theme-adaptive-soft {
+  background-image: linear-gradient(90deg, #f5f3ff, #ffffff, #f0fdfa) !important;
+}
+
+.theme-dark .marketing-home-light [class~="bg-white"],
+.theme-dark .marketing-home-light [class~="bg-white/50"],
+.theme-dark .marketing-home-light [class~="bg-white/65"],
+.theme-dark .marketing-home-light [class~="bg-white/70"],
+.theme-dark .marketing-home-light [class~="bg-white/72"],
+.theme-dark .marketing-home-light [class~="bg-white/78"],
+.theme-dark .marketing-home-light [class~="bg-white/80"],
+.theme-dark .marketing-home-light [class~="bg-white/85"],
+.theme-dark .marketing-home-light [class~="bg-white/88"],
+.theme-dark .marketing-home-light [class~="bg-white/90"] {
+  background-color: #ffffff !important;
+}
+
+.theme-dark .marketing-home-light [class~="bg-slate-50"],
+.theme-dark .marketing-home-light [class~="bg-slate-100"],
+.theme-dark .marketing-home-light [class~="bg-slate-100/70"] {
+  background-color: #f8fafc !important;
+}
+
+.theme-dark .marketing-home-light [class~="bg-violet-50"],
+.theme-dark .marketing-home-light [class~="bg-violet-50/70"],
+.theme-dark .marketing-home-light [class~="bg-violet-50/80"],
+.theme-dark .marketing-home-light [class~="bg-violet-100"],
+.theme-dark .marketing-home-light [class~="bg-violet-100/70"],
+.theme-dark .marketing-home-light [class~="bg-violet-100/80"] {
+  background-color: #f5f3ff !important;
+}
+
+.theme-dark .marketing-home-light [class~="bg-cyan-50"],
+.theme-dark .marketing-home-light [class~="bg-cyan-50/70"],
+.theme-dark .marketing-home-light [class~="bg-cyan-50/80"],
+.theme-dark .marketing-home-light [class~="bg-cyan-100/80"] {
+  background-color: #ecfeff !important;
+}
+
+.theme-dark .marketing-home-light [class~="bg-emerald-50"],
+.theme-dark .marketing-home-light [class~="bg-emerald-50/70"],
+.theme-dark .marketing-home-light [class~="bg-emerald-100/80"] {
+  background-color: #ecfdf5 !important;
+}
+
+.theme-dark .marketing-home-light [class~="bg-amber-50"],
+.theme-dark .marketing-home-light [class~="bg-amber-50/70"],
+.theme-dark .marketing-home-light [class~="bg-amber-100/80"] {
+  background-color: #fffbeb !important;
+}
+
+.theme-dark .marketing-home-light [class~="text-slate-950"],
+.theme-dark .marketing-home-light [class~="text-slate-900"],
+.theme-dark .marketing-home-light [class~="text-slate-800"],
+.theme-dark .marketing-home-light [class~="text-slate-700"] {
+  color: #0f172a !important;
+}
+
+.theme-dark .marketing-home-light [class~="text-slate-600"],
+.theme-dark .marketing-home-light [class~="text-slate-500"],
+.theme-dark .marketing-home-light [class~="text-slate-400"] {
+  color: #475569 !important;
+}
+
+.theme-dark .marketing-home-light [class~="text-violet-700"],
+.theme-dark .marketing-home-light [class~="text-violet-800"],
+.theme-dark .marketing-home-light [class~="text-violet-900"] {
+  color: #6d28d9 !important;
+}
+
+.theme-dark .marketing-home-light [class~="text-blue-700"],
+.theme-dark .marketing-home-light [class~="text-blue-800"] {
+  color: #1d4ed8 !important;
+}
+
+.theme-dark .marketing-home-light [class~="text-cyan-700"],
+.theme-dark .marketing-home-light [class~="text-cyan-800"],
+.theme-dark .marketing-home-light [class~="text-cyan-900"],
+.theme-dark .marketing-home-light [class~="text-cyan-950"] {
+  color: #0e7490 !important;
+}
+
+.theme-dark .marketing-home-light [class~="text-emerald-700"],
+.theme-dark .marketing-home-light [class~="text-emerald-800"],
+.theme-dark .marketing-home-light [class~="text-emerald-900"] {
+  color: #047857 !important;
+}
+
+.theme-dark .marketing-home-light [class~="text-amber-700"],
+.theme-dark .marketing-home-light [class~="text-amber-800"],
+.theme-dark .marketing-home-light [class~="text-amber-900"] {
+  color: #b45309 !important;
+}
+
+.theme-dark .marketing-home-light [class~="border-slate-100"],
+.theme-dark .marketing-home-light [class~="border-slate-200"],
+.theme-dark .marketing-home-light [class~="border-slate-300"],
+.theme-dark .marketing-home-light [class~="border-slate-200/80"] {
+  border-color: #dbe3ef !important;
+}
+
+.theme-dark .marketing-home-light [class~="border-white/70"],
+.theme-dark .marketing-home-light [class~="border-white/80"] {
+  border-color: rgba(255, 255, 255, 0.88) !important;
+}
+
+.theme-dark .marketing-home-light input,
+.theme-dark .marketing-home-light textarea,
+.theme-dark .marketing-home-light select {
+  border-color: #dbe3ef !important;
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  -webkit-text-fill-color: #0f172a;
+}
+
+.theme-dark .marketing-home-light input::placeholder,
+.theme-dark .marketing-home-light textarea::placeholder {
+  color: #64748b;
+  -webkit-text-fill-color: #64748b;
+}
+
+.marketing-header-light {
+  background-color: rgba(255, 255, 255, 0.94) !important;
+  border-color: rgba(15, 23, 42, 0.08) !important;
+  color: #0f172a !important;
+}
+
+.theme-dark .marketing-header-light [class~="bg-white"],
+.theme-dark .marketing-header-light [class~="bg-white/88"] {
+  background-color: #ffffff !important;
+}
+
+.theme-dark .marketing-header-light [class~="bg-slate-50"] {
+  background-color: #f8fafc !important;
+}
+
+.theme-dark .marketing-header-light [class~="text-slate-950"],
+.theme-dark .marketing-header-light [class~="text-slate-900"],
+.theme-dark .marketing-header-light [class~="text-slate-800"],
+.theme-dark .marketing-header-light [class~="text-slate-700"] {
+  color: #0f172a !important;
+}
+
+.theme-dark .marketing-header-light [class~="text-slate-600"],
+.theme-dark .marketing-header-light [class~="text-slate-500"] {
+  color: #475569 !important;
+}
+
+.theme-dark .marketing-header-light [class~="border-slate-100"],
+.theme-dark .marketing-header-light [class~="border-slate-200"],
+.theme-dark .marketing-header-light [class~="border-slate-300"] {
+  border-color: #dbe3ef !important;
+}
+
+.marketing-footer-light {
+  background: #ffffff !important;
+  border-color: #dbe3ef !important;
+  color: #0f172a !important;
+}
+
+.marketing-footer-light [class~="text-white"],
+.theme-dark .marketing-footer-light [class~="text-white"] {
+  color: #0f172a !important;
+}
+
+.marketing-footer-light [class~="text-slate-300"],
+.marketing-footer-light [class~="text-slate-400"],
+.theme-dark .marketing-footer-light [class~="text-slate-300"],
+.theme-dark .marketing-footer-light [class~="text-slate-400"] {
+  color: #475569 !important;
+}
+
+.marketing-footer-light [class~="border-white/10"],
+.theme-dark .marketing-footer-light [class~="border-white/10"] {
+  border-color: #dbe3ef !important;
+}
+
+.marketing-footer-light [class~="bg-white/5"],
+.theme-dark .marketing-footer-light [class~="bg-white/5"] {
+  background-color: #f8fafc !important;
+}
+
+.marketing-footer-light a:hover {
+  color: #1d4ed8 !important;
+}
+
 :focus-visible {
   outline: 3px solid #8b5cf6;
   outline-offset: 3px;

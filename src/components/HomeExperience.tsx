@@ -570,7 +570,7 @@ export function HomeExperience() {
   }
 
   return (
-    <main>
+    <main className="marketing-home-light">
       <section id="audit" className="surface-grid relative overflow-hidden px-5 py-16 sm:px-8 lg:py-20">
         <div className="mx-auto grid w-full max-w-7xl gap-12 lg:grid-cols-[1fr_0.86fr] lg:items-center">
           <div>

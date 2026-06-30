@@ -88,11 +88,12 @@ function AccountMenu({ user, onNavigate }: { user: HeaderUser; onNavigate?: () =
 export function Header({ user = null }: { user?: HeaderUser }) {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
+  const isHomePage = pathname === "/";
 
   if (isWorkspacePath(pathname)) return null;
 
   return (
-    <header className="sticky top-0 z-50 border-b border-slate-900/5 bg-white/88 backdrop-blur-xl">
+    <header className={`${isHomePage ? "marketing-header-light " : ""}sticky top-0 z-50 border-b border-slate-900/5 bg-white/88 backdrop-blur-xl`}>
       <div className="mx-auto flex min-h-18 w-full max-w-7xl items-center justify-between gap-4 px-5 py-3 sm:px-8">
         <Link href="/" className="flex items-center gap-3" aria-label="QueryCite home">
           <span className="grid size-10 place-items-center rounded-2xl bg-slate-950 text-sm font-black text-white shadow-lg shadow-slate-950/12">QC</span>
@@ -112,8 +113,8 @@ export function Header({ user = null }: { user?: HeaderUser }) {
 
         <div className="hidden items-center gap-3 lg:flex">
           <AccountMenu user={user} />
-          <Link href="/#audit" className="inline-flex min-h-11 items-center rounded-full bg-slate-950 px-5 text-sm font-semibold text-white shadow-lg shadow-slate-950/10 transition hover:-translate-y-0.5 hover:bg-slate-800">
-            Run Free Audit
+          <Link href="/#audit" className="inline-flex min-h-11 items-center rounded-full bg-blue-600 px-5 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:-translate-y-0.5 hover:bg-blue-700">
+            Scan your website free
           </Link>
         </div>
 
@@ -143,8 +144,8 @@ export function Header({ user = null }: { user?: HeaderUser }) {
             <div className="mt-2 rounded-2xl border border-slate-100 bg-slate-50 p-3">
               <AccountMenu user={user} onNavigate={() => setIsOpen(false)} />
             </div>
-            <Link href="/#audit" onClick={() => setIsOpen(false)} className="mt-2 inline-flex min-h-12 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-semibold text-white">
-              Run Free Audit
+            <Link href="/#audit" onClick={() => setIsOpen(false)} className="mt-2 inline-flex min-h-12 items-center justify-center rounded-full bg-blue-600 px-5 text-sm font-semibold text-white">
+              Scan your website free
             </Link>
           </nav>
         </div>

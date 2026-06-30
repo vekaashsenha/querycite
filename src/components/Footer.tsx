@@ -27,10 +27,11 @@ function isWorkspacePath(pathname: string) {
 
 export function Footer() {
   const pathname = usePathname();
+  const isHomePage = pathname === "/";
   if (isWorkspacePath(pathname)) return null;
 
   return (
-    <footer className="border-t border-slate-900/10 bg-slate-950 text-white">
+    <footer className={`${isHomePage ? "marketing-footer-light " : ""}border-t border-slate-900/10 bg-slate-950 text-white`}>
       <div className="mx-auto grid w-full max-w-7xl gap-10 px-5 py-14 sm:px-8 lg:grid-cols-[1.05fr_2fr]">
         <div>
           <Link href="/" className="flex items-center gap-3" aria-label="QueryCite home">
