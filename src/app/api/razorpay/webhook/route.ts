@@ -92,16 +92,7 @@ function planNameFrom(subscription: JsonRecord, payment: JsonRecord) {
   return noteText(subscription, payment, "plan_name") || noteText(subscription, payment, "selected_plan") || "starter";
 }
 
-function accessTypeFrom(subscription: JsonRecord, payment: JsonRecord) {
-  return noteText(subscription, payment, "access_type");
-}
-
-function isAdminLiveTest(subscription: JsonRecord, payment: JsonRecord) {
-  return accessTypeFrom(subscription, payment) === "admin_live_test" || noteText(subscription, payment, "payment_type") === "admin_live_test";
-}
-
 function paymentTypeFrom(subscription: JsonRecord, payment: JsonRecord) {
-  if (isAdminLiveTest(subscription, payment)) return "admin_live_test";
   const explicitPaymentType = noteText(subscription, payment, "payment_type");
   if (explicitPaymentType) return explicitPaymentType;
   if (text(payment.subscription_id) || text(subscription.id)) return "subscription_test";
@@ -293,8 +284,7 @@ async function upsertSubscription(payload: JsonRecord, eventName: string) {
   if (!subscriptionId) {
     const paymentType = paymentTypeFrom(subscription, payment);
     const orderId = text(payment.order_id);
-    const adminLiveTest = isAdminLiveTest(subscription, payment);
-    if (!["one_time_beta", "admin_live_test"].includes(paymentType) || !orderId) return null;
+    if (paymentType !== "one_time_beta" || !orderId) return null;
 
     const paymentId = text(payment.id);
     const couponCode = couponCodeFrom(subscription, payment);
@@ -309,9 +299,8 @@ async function upsertSubscription(payload: JsonRecord, eventName: string) {
       razorpay_order_id: `eq.${orderId}`,
       limit: "1",
     });
-    const couponAllows = !adminLiveTest && captured && hasAccountOwner ? await couponAllowsCapturedAccess(couponCode, userId, email, paymentId) : false;
-    const adminLiveTestAllows = adminLiveTest && captured && hasAccountOwner && amount === 1000 && currency.toUpperCase() === "INR";
-    const paidAccessAllowed = couponAllows || adminLiveTestAllows;
+    const couponAllows = captured && hasAccountOwner ? await couponAllowsCapturedAccess(couponCode, userId, email, paymentId) : false;
+    const paidAccessAllowed = couponAllows;
     const existingStartsAt = existing[0]?.access_starts_at ?? existing[0]?.current_period_start ?? null;
     const existingEndsAt = existing[0]?.access_ends_at ?? existing[0]?.current_period_end ?? null;
     const existingWindow = existingStartsAt && existingEndsAt ? { startsAt: existingStartsAt, endsAt: existingEndsAt } : null;
@@ -324,11 +313,9 @@ async function upsertSubscription(payload: JsonRecord, eventName: string) {
         ? "unassigned"
         : captured && paidAccessAllowed
           ? "active"
-          : adminLiveTest
-            ? "admin_live_test_invalid"
-            : couponCode
-              ? "coupon_invalid"
-              : "pending";
+          : couponCode
+            ? "coupon_invalid"
+            : "pending";
 
     const row = {
       user_id: userId,
@@ -357,7 +344,7 @@ async function upsertSubscription(payload: JsonRecord, eventName: string) {
       failed_payment_count: eventName === "payment.failed" ? 1 : 0,
       website_url: websiteFrom(subscription, payment),
       raw_event: payload,
-      metadata: { event: eventName, notes: notesFrom(payment), access_type: adminLiveTest ? "admin_live_test" : "paid_beta_one_time", internal_test: adminLiveTest },
+      metadata: { event: eventName, notes: notesFrom(payment), access_type: "paid_beta_one_time" },
       updated_at: now,
     };
 
@@ -427,7 +414,7 @@ async function upsertPayment(payload: JsonRecord, eventName: string, subscriptio
   const now = new Date().toISOString();
   const paymentType = paymentTypeFrom(subscription, payment);
   const captured = eventName === "payment.captured";
-  const accessWindow = ["one_time_beta", "admin_live_test"].includes(paymentType) && captured
+  const accessWindow = paymentType === "one_time_beta" && captured
     ? await storedAccessWindow(subscriptionRowId) ?? { startsAt: null, endsAt: null }
     : { startsAt: null, endsAt: null };
   const row = {
@@ -484,10 +471,10 @@ async function sendWebhookEmails(payload: JsonRecord, eventName: string, subscri
   const paymentId = text(payment.id);
   const orderId = text(payment.order_id);
   const paymentType = paymentTypeFrom(subscription, payment);
-  const accessWindow = ["one_time_beta", "admin_live_test"].includes(paymentType) && eventName === "payment.captured"
+  const accessWindow = paymentType === "one_time_beta" && eventName === "payment.captured"
     ? await storedAccessWindow(subscriptionRowId) ?? { startsAt: null, endsAt: null }
     : { startsAt: null, endsAt: null };
-  const hasFullReportAccess = ["one_time_beta", "admin_live_test"].includes(paymentType) && eventName === "payment.captured" ? Boolean(accessWindow.endsAt) : paymentType !== "one_time_test" && Boolean(subscriptionId);
+  const hasFullReportAccess = paymentType === "one_time_beta" && eventName === "payment.captured" ? Boolean(accessWindow.endsAt) : paymentType !== "one_time_test" && Boolean(subscriptionId);
   const amount = numberValue(payment.amount);
   const data = {
     email: recipient,

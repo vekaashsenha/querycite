@@ -1,10 +1,8 @@
 import Link from "next/link";
-import { AdminLivePaymentTestButton } from "@/components/AdminLivePaymentTestButton";
 import { DashboardShell, WorkspaceHeader } from "@/components/DashboardShell";
 import { FeedbackCta } from "@/components/FeedbackCta";
 import { AppCard, EmptyState, MetricCard, StatusPill } from "@/components/ui";
 import { formatPaise, getPaidAccessContextForUser, getPaymentHistoryForUser, isPaidPaymentRecord } from "@/lib/paid-foundation";
-import { getRazorpaySafeDiagnostics } from "@/lib/razorpay";
 import { requireAuthenticatedUser, syncAuthenticatedUser } from "@/lib/auth/server";
 
 function formatDate(value: string | null | undefined) {
@@ -18,7 +16,6 @@ export default async function BillingPage() {
   const access = await getPaidAccessContextForUser(user);
   const payments = await getPaymentHistoryForUser(user);
   const paidPayments = payments.filter(isPaidPaymentRecord);
-  const razorpayDiagnostics = access.isAdmin ? getRazorpaySafeDiagnostics() : null;
   const badgeText = access.qaAccess ? "Admin" : access.isPaidBetaAccess ? "Beta active" : access.isExpiredBetaAccess ? "Beta expired" : access.verifiedPaidAccess ? "Paid access active" : "No active access";
   const badgeTone = access.qaAccess ? "cyan" : access.isPaidBetaAccess ? "green" : access.isExpiredBetaAccess ? "amber" : access.verifiedPaidAccess ? "green" : "amber";
 
@@ -36,40 +33,6 @@ export default async function BillingPage() {
         <MetricCard label="Access active until" value={formatDate(access.accessEndsAt ?? access.currentPeriodEnd)} detail={access.isPaidBetaAccess || access.isExpiredBetaAccess ? "1-month access" : "Current access period"} tone="slate" />
       </section>
 
-      {access.isAdmin ? (
-        <div className="grid gap-4 xl:grid-cols-[1fr_1fr]">
-          <AppCard className="border-cyan-200 bg-cyan-50/70 p-6">
-            <WorkspaceHeader
-              eyebrow="Admin only"
-              title="Admin Live Payment Test"
-              description={"Pay \u20b910 to verify live Razorpay payment, webhook, access activation, invoice, and Starter feature unlock."}
-            />
-            <div className="mt-5">
-              <AdminLivePaymentTestButton />
-            </div>
-          </AppCard>
-
-          <AppCard className="border-slate-200 bg-white p-6">
-            <WorkspaceHeader
-              eyebrow="Admin only"
-              title="Razorpay Configuration"
-              description="Safe runtime mode check. Secret values are never shown."
-            />
-            <div className="mt-5 grid gap-3 text-sm">
-              {[
-                ["Razorpay public key mode", razorpayDiagnostics?.publicKeyMode ?? "missing"],
-                ["Razorpay server key mode", razorpayDiagnostics?.serverKeyMode ?? "missing"],
-                ["Webhook secret configured", razorpayDiagnostics?.webhookSecretConfigured ? "yes" : "no"],
-              ].map(([label, value]) => (
-                <div key={label} className="flex items-center justify-between gap-4 rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                  <span className="font-semibold text-slate-600">{label}</span>
-                  <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-slate-950">{value}</span>
-                </div>
-              ))}
-            </div>
-          </AppCard>
-        </div>
-      ) : null}
 
       <section className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
         <AppCard className="p-6">

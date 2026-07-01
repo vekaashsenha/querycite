@@ -16,7 +16,7 @@ export type RazorpayOrderInput = RazorpaySubscriptionInput & {
   couponCode?: string;
   couponFinalAmountPaise?: number;
   couponType?: string;
-  paymentType?: "one_time_beta" | "one_time_test" | "admin_live_test";
+  paymentType?: "one_time_beta" | "one_time_test";
   userId?: string;
   accessDurationDays?: number;
   extraNotes?: Record<string, string>;
@@ -59,26 +59,6 @@ const oneTimeOrderPrices: Record<RazorpayPlanName, number> = {
   agency: 999900,
 };
 
-
-export type RazorpayKeyMode = "test" | "live" | "missing";
-
-function razorpayKeyMode(value: string | undefined): RazorpayKeyMode {
-  const key = value?.trim() || "";
-  if (key.startsWith("rzp_live_")) return "live";
-  if (key.startsWith("rzp_test_")) return "test";
-  return "missing";
-}
-
-export function getRazorpaySafeDiagnostics() {
-  const publicKeyMode = razorpayKeyMode(process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID);
-  const serverKeyMode = process.env.RAZORPAY_KEY_SECRET ? publicKeyMode : "missing";
-
-  return {
-    publicKeyMode,
-    serverKeyMode,
-    webhookSecretConfigured: Boolean(process.env.RAZORPAY_WEBHOOK_SECRET),
-  };
-}
 
 export function isRazorpayPlanName(value: unknown): value is RazorpayPlanName {
   return value === "starter" || value === "pro" || value === "agency";
