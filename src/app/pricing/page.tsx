@@ -85,31 +85,35 @@ export default async function PricingPage() {
   const couponAlreadyUsed = Boolean(access?.isExpiredBetaAccess);
 
   return (
-    <main className="px-5 py-16 sm:px-8">
+    <main className="marketing-home-light px-5 py-16 sm:px-8">
       <PageIntro
         eyebrow="Pricing"
-        title="Start free. Choose the depth of action your team needs."
-        description="Simple beta pricing for a first audit, hands-on implementation, or ongoing AEO/GEO work."
+        title="Start free. Choose the depth of action you need."
+        description="Simple beta pricing for a first website scan, hands-on fixes, or ongoing AI visibility work. No credit card needed to start."
       />
-      <p className="mx-auto mt-4 max-w-2xl text-center text-sm font-semibold text-slate-500">Billed in supported currency at checkout.</p>
+      <p className="mx-auto mt-4 max-w-2xl text-center text-sm font-medium text-slate-500">Billed in your supported currency at checkout. Payment requires an account.</p>
 
-      <section className="mx-auto mt-10 grid max-w-6xl gap-5 lg:grid-cols-3">
+      <section className="mx-auto mt-12 grid max-w-6xl items-start gap-5 md:grid-cols-2 lg:grid-cols-3">
         {plans.map((plan) => (
-          <AppCard key={plan.name} className={`flex flex-col p-6 ${plan.highlighted ? "border-violet-300 bg-violet-50 shadow-[0_24px_70px_rgba(91,33,182,0.14)]" : ""}`}>
+          <AppCard
+            key={plan.name}
+            className={`relative flex h-full flex-col p-6 ${plan.highlighted ? "border-blue-300 shadow-[0_24px_70px_rgba(37,99,235,0.16)] ring-1 ring-blue-200 lg:-mt-3 lg:pt-8" : ""}`}
+          >
+            {plan.highlighted ? (
+              <span className="absolute -top-3 left-6 inline-flex items-center rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white shadow-sm">Most popular</span>
+            ) : null}
             <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-xl font-semibold text-slate-950">{plan.name}</h2>
-                <p className="mt-3 text-3xl font-semibold text-slate-950">{plan.price}</p>
-              </div>
-              <StatusPill tone={plan.tone}>{plan.badge}</StatusPill>
+              <h2 className="text-lg font-semibold text-slate-950">{plan.name}</h2>
+              {!plan.highlighted ? <StatusPill tone={plan.tone}>{plan.badge}</StatusPill> : null}
             </div>
-            <p className="mt-4 text-sm font-semibold leading-6 text-slate-700">{plan.description}</p>
-            <p className="mt-4 rounded-2xl border border-slate-100 bg-white/80 p-3 text-xs font-semibold uppercase tracking-[0.12em] text-slate-600">Best for: {plan.bestFor}</p>
-            <div className="mt-5 grid gap-2">
+            <p className="mt-4 text-3xl font-semibold tracking-tight text-slate-950">{plan.price}</p>
+            <p className="mt-3 text-sm leading-6 text-slate-600">{plan.description}</p>
+            <p className="mt-4 rounded-xl bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600">Best for: {plan.bestFor}</p>
+            <div className="mt-5 grid gap-2.5">
               {plan.includes.map((item) => (
-                <div key={item} className="qc-surface flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-3 text-sm font-semibold text-slate-700">
-                  <span className="grid size-6 shrink-0 place-items-center rounded-full bg-slate-950 text-[10px] text-white" aria-hidden="true">✓</span>
-                  {item}
+                <div key={item} className="flex items-start gap-3 text-sm leading-6 text-slate-700">
+                  <span className={`mt-0.5 grid size-5 shrink-0 place-items-center rounded-full text-[10px] font-bold text-white ${plan.highlighted ? "bg-blue-600" : "bg-slate-900"}`} aria-hidden="true">✓</span>
+                  <span className="font-medium">{item}</span>
                 </div>
               ))}
             </div>

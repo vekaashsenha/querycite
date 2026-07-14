@@ -35,7 +35,7 @@ const featureClusters: Array<{
     summary: "One scan turns technical and content signals into a clear readiness baseline.",
     bullets: ["AI Visibility, AEO, and GEO scores", "Crawler and access checks"],
     wide: true,
-    className: "border-violet-200 bg-violet-50/70",
+    className: "border-slate-200 bg-white",
   },
   {
     kind: "insight",
@@ -44,7 +44,7 @@ const featureClusters: Array<{
     summary: "Each gap is translated into a practical action for the team that owns it.",
     bullets: ["llms.txt and content guidance", "Ready-to-paste fixes and developer notes"],
     wide: false,
-    className: "border-amber-200 bg-amber-50/70",
+    className: "border-slate-200 bg-white",
   },
   {
     kind: "intelligence",
@@ -53,7 +53,7 @@ const featureClusters: Array<{
     summary: "Compare readiness signals and use report-grounded guidance to prioritize the work.",
     bullets: ["Competitor comparison", "AI Visibility Advisor"],
     wide: false,
-    className: "border-cyan-200 bg-cyan-50/70",
+    className: "border-slate-200 bg-white",
   },
   {
     kind: "output",
@@ -62,7 +62,7 @@ const featureClusters: Array<{
     summary: "Package the audit into useful formats for review, implementation, and follow-up.",
     bullets: ["PDF and CSV reports", "Share and email report workflows"],
     wide: true,
-    className: "border-emerald-200 bg-emerald-50/70",
+    className: "border-slate-200 bg-white",
   },
 ];
 
@@ -256,20 +256,6 @@ function HeroPreview() {
           ))}
         </div>
       </ClayCard>
-    </div>
-  );
-}
-
-function FeatureGlyph({ title }: { title: string }) {
-  const label = title.includes("Score") ? "Score" : title.includes("Comparison") ? "Competitor" : title.includes("Advisor") ? "Advisor" : title.toLowerCase().includes("fixes") ? "Fixes" : title.toLowerCase().includes("notes") ? "Audit" : title.toLowerCase().includes("reports") ? "Reports" : "Audit";
-
-  return (
-    <div className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
-      <span className="relative grid size-7 place-items-center rounded-xl bg-slate-950/5" aria-hidden="true">
-        <span className="block size-3 rounded-full border-2 border-violet-700" />
-        <span className="absolute bottom-1 right-1 block size-2 rounded-full bg-teal-500" />
-      </span>
-      <span className="text-xs font-semibold text-slate-600">{label}</span>
     </div>
   );
 }
@@ -572,27 +558,38 @@ export function HomeExperience() {
   return (
     <main className="marketing-home-light">
       <section id="audit" className="surface-grid relative overflow-hidden px-5 py-16 sm:px-8 lg:py-20">
-        <div className="mx-auto grid w-full max-w-7xl gap-12 lg:grid-cols-[1fr_0.86fr] lg:items-center">
+        <div className="mx-auto grid w-full max-w-7xl gap-10 lg:grid-cols-[1fr_0.86fr] lg:items-center lg:gap-12">
           <div>
-            <h1 className="max-w-5xl text-5xl font-semibold leading-[1.02] tracking-normal text-slate-950 sm:text-6xl lg:text-7xl">
+            <span className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+              <span className="size-1.5 rounded-full bg-blue-600" aria-hidden="true" />
+              AI search readiness for your brand
+            </span>
+            <h1 className="mt-5 max-w-4xl text-pretty text-4xl font-semibold leading-[1.05] tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
               Your customers are asking AI. Is your brand showing up?
             </h1>
-            <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-700">
+            <p className="mt-5 max-w-xl text-pretty text-base leading-7 text-slate-600 sm:text-lg sm:leading-8">
               QueryCite scans your website to find why AI search may not understand, cite, or recommend your brand &mdash; then gives you ready-to-use fixes.
             </p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Link href="/#audit" className="inline-flex min-h-12 items-center justify-center rounded-full bg-blue-600 px-6 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:-translate-y-0.5 hover:bg-blue-700">Scan your website free</Link>
-              <Link href="/#how-it-works" className="inline-flex min-h-12 items-center justify-center rounded-full border border-slate-300 bg-white px-6 text-sm font-semibold text-slate-900 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-700 hover:text-blue-800">See how it works</Link>
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+              <Link href="/#audit" className="inline-flex min-h-12 items-center justify-center rounded-full bg-blue-600 px-7 text-sm font-semibold text-white shadow-lg shadow-blue-600/25 transition hover:-translate-y-0.5 hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-200">Scan your website free</Link>
+              <Link href="/#how-it-works" className="inline-flex min-h-12 items-center justify-center rounded-full border border-slate-300 bg-white px-7 text-sm font-semibold text-slate-900 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-600 hover:text-blue-700 focus:outline-none focus:ring-4 focus:ring-slate-100">See how it works</Link>
             </div>
-            <div className="mt-6 flex flex-wrap gap-3">
+            <div className="mt-7 flex flex-wrap gap-2">
               {valueItems.map((item) => <StatusPill key={item} tone="slate">{item}</StatusPill>)}
             </div>
-            <p className="mt-5 max-w-2xl rounded-2xl border border-slate-200 bg-white/85 p-4 text-xs font-semibold leading-5 text-slate-600">QueryCite improves AI visibility readiness. It does not guarantee rankings, traffic, or AI citations.</p>
+            <p className="mt-6 flex max-w-xl items-start gap-2 text-xs leading-5 text-slate-500">
+              <span aria-hidden="true" className="mt-0.5 grid size-4 shrink-0 place-items-center rounded-full border border-slate-300 text-[9px] font-bold text-slate-400">i</span>
+              QueryCite improves AI visibility readiness. It does not guarantee rankings, traffic, or AI citations.
+            </p>
           </div>
 
           <div className="grid gap-5">
-            <ClayCard className="bg-white/90">
-              <h2 className="text-2xl font-semibold leading-tight text-slate-950">Run a free website scan</h2>
+            <ClayCard className="bg-white">
+              <div className="flex items-center gap-2">
+                <StatusPill tone="green">Free scan</StatusPill>
+                <span className="text-xs font-semibold text-slate-500">No credit card needed</span>
+              </div>
+              <h2 className="mt-4 text-2xl font-semibold leading-tight text-slate-950">Run a free website scan</h2>
               <p className="mt-2 text-sm leading-6 text-slate-600">Enter your website to see where AI search may need clearer signals about your brand.</p>
               <form onSubmit={runAudit} className="mt-6 grid gap-3" noValidate>
                 <label htmlFor="audit-url" className="text-sm font-semibold text-slate-700">Website URL</label>
@@ -609,12 +606,13 @@ export function HomeExperience() {
                   placeholder="Enter your website URL, for example byldgroup.com"
                   aria-invalid={Boolean(urlError)}
                   aria-describedby={urlError ? "audit-url-error" : undefined}
-                  className="min-h-14 rounded-2xl border border-slate-200 bg-white px-5 text-base outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
+                  className="min-h-14 rounded-2xl border border-slate-200 bg-white px-5 text-base outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
                 />
                 {urlError ? <p id="audit-url-error" className="text-sm font-semibold leading-5 text-rose-600">{urlError}</p> : null}
-                <button type="submit" disabled={scanState === "scanning"} className="min-h-14 rounded-2xl bg-blue-600 px-6 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:-translate-y-0.5 hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400">
+                <button type="submit" disabled={scanState === "scanning"} className="min-h-14 rounded-2xl bg-blue-600 px-6 text-sm font-semibold text-white shadow-lg shadow-blue-600/25 transition hover:-translate-y-0.5 hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-200 disabled:cursor-not-allowed disabled:bg-slate-400">
                   {scanState === "scanning" ? "Running scan..." : "Scan your website free"}
                 </button>
+                <p className="text-center text-xs font-medium leading-5 text-slate-500">Takes about a minute. You will see your top findings instantly.</p>
               </form>
             </ClayCard>
             <HeroPreview />
@@ -622,17 +620,19 @@ export function HomeExperience() {
         </div>
       </section>
 
-      <section className="px-5 pb-10 sm:px-8">
-        <div className="mx-auto grid max-w-7xl gap-3 rounded-3xl border border-white/70 bg-white/78 p-4 shadow-sm sm:grid-cols-2 lg:grid-cols-5">
-          {valueItems.map((item, index) => (
-            <div key={item} className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
-              <FeatureGlyph title={item} />
-              <p className="mt-3 text-sm font-semibold text-slate-800">{item}</p>
-              <div className="mt-3 h-1.5 rounded-full bg-slate-100" aria-hidden="true">
-                <div className="h-1.5 rounded-full bg-violet-600" style={{ width: `${52 + index * 9}%` }} />
+      <section className="px-5 pb-12 sm:px-8">
+        <div className="mx-auto max-w-7xl rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <p className="text-center text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">What every scan checks</p>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            {valueItems.map((item) => (
+              <div key={item} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                <span className="grid size-8 shrink-0 place-items-center rounded-full border border-blue-100 bg-blue-50" aria-hidden="true">
+                  <span className="size-2.5 rounded-full bg-blue-600" />
+                </span>
+                <p className="text-sm font-semibold leading-5 text-slate-800">{item}</p>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </section>
 

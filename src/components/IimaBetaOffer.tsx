@@ -100,9 +100,9 @@ export function IimaBetaOffer({ name, email, isAuthenticated = false, hasActiveP
     <section className="theme-adaptive-soft mx-auto mt-8 max-w-6xl overflow-hidden rounded-3xl border border-cyan-200 p-6 shadow-sm">
       <div className="grid gap-6 lg:grid-cols-[0.92fr_1.08fr] lg:items-center">
         <div>
-          <StatusPill tone="cyan">IIMA beta offer</StatusPill>
-          <h2 className="mt-4 text-2xl font-semibold text-slate-950">Exclusive IIMA Beta Offer</h2>
-          <p className="mt-2 text-sm font-semibold text-slate-700">For AGMP18 and DMBPT02 cohort members</p>
+          <StatusPill tone="cyan">Optional IIMA beta offer</StatusPill>
+          <h2 className="mt-4 text-2xl font-semibold text-slate-950">A thank-you offer for IIMA cohort members</h2>
+          <p className="mt-2 text-sm font-semibold text-slate-700">Optional early access for AGMP18 and DMBPT02 members who want to try the full experience.</p>
           <div className="mt-5 flex flex-wrap items-end gap-3">
             <p className="text-3xl font-semibold text-slate-950">{iimaBetaPriceLabel}</p>
             <p className="pb-1 text-sm font-semibold text-slate-500">$2 equivalent</p>
