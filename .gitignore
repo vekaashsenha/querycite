@@ -2,6 +2,10 @@
 node_modules/
 out/
 build/
+cloudflare-env.d.ts
+.dev.vars
+.wrangler/
+.open-next/
 .env
 .env*.local
 *.log
