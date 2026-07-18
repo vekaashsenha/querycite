@@ -105,6 +105,15 @@ function LeadCaptureModal({ report, onSuccess }: { report: WebsiteAuditReport; o
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
+
   async function submitLead(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const trimmedName = fullName.trim();
@@ -164,8 +173,8 @@ function LeadCaptureModal({ report, onSuccess }: { report: WebsiteAuditReport; o
   }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/50 px-4 py-8 backdrop-blur-sm">
-      <div className="w-full max-w-2xl rounded-[2rem] border border-white/80 bg-white p-6 shadow-2xl shadow-slate-950/25 sm:p-8">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain bg-slate-950/50 px-3 py-3 backdrop-blur-sm [-webkit-overflow-scrolling:touch] sm:items-center sm:px-4 sm:py-8">
+      <div className="relative mx-auto my-0 w-full max-w-2xl overflow-y-auto overscroll-contain rounded-[2rem] border border-white/80 bg-white p-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-2xl shadow-slate-950/25 [-webkit-overflow-scrolling:touch] max-h-[calc(100vh-24px)] max-h-[calc(100dvh-24px)] sm:my-auto sm:p-8">
         <StatusPill tone="violet">Free report access</StatusPill>
         <h2 className="mt-4 text-3xl font-semibold leading-tight text-slate-950">Get your free AI Visibility Report</h2>
         <p className="mt-3 text-sm leading-6 text-slate-600">Enter your details to view your website-based AI visibility report. We will use your information to share your report and relevant QueryCite updates.</p>
