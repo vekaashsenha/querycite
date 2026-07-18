@@ -2,6 +2,51 @@
 
 A Next.js MVP for QueryCite, an AI Visibility Audit and AEO/GEO fix generator SaaS. The app uses deterministic website checks for audit scoring and Gemini for the private-beta AI Visibility Advisor chat.
 
+## How Codex & GPT-5.6 Were Used
+
+QueryCite was built with heavy support from Codex and GPT-5.6 throughout the product development process.
+
+GPT-5.6 was used for:
+- Refining the product idea and positioning
+- Turning the concept into a founder-friendly SaaS workflow
+- Improving homepage messaging and product copy
+- Reviewing UI/UX decisions
+- Creating launch content, project story, demo script, and submission assets
+- Thinking through pricing, beta access, and user onboarding
+- Challenging unclear messaging and reducing technical jargon
+
+Codex was used for:
+- Implementing the Next.js and TypeScript application
+- Building and debugging product flows
+- Connecting Supabase authentication and database flows
+- Implementing Razorpay payment and webhook validation
+- Improving coupon and subscription access logic
+- Creating billing, invoice, and report access flows
+- Adding the Gemini-powered AI Advisor experience
+- Generating project media planning files and demo assets
+- Setting up Cloudflare Workers/OpenNext staging foundation without touching Vercel production
+
+Human oversight:
+- All product decisions, positioning, testing, and launch choices were reviewed manually.
+- Razorpay payments, webhook behavior, subscription access, billing, invoices, and report unlocking were manually validated.
+- Codex and GPT-5.6 were used as build and reasoning partners, not as a replacement for product judgment.
+
+## Built With
+
+- Next.js
+- TypeScript
+- React
+- Supabase
+- Gemini
+- Razorpay
+- Resend
+- Vercel
+- GitHub
+- Codex
+- GPT-5.6
+- Figma
+- Tailwind CSS
+
 ## Setup
 
 1. Install dependencies:
@@ -177,6 +222,23 @@ Verify email sending by submitting the lead form or contact form with Resend env
 - Add customer-facing billing management and cancellation flows.
 - Finalize billing, refund, and subscription policy pages.
 - Confirm webhook retries, email deliverability, and Supabase RLS policies in production.
+
+
+## Cloudflare Workers Staging
+
+Cloudflare Workers staging support is configured with OpenNext and Wrangler while production remains on Vercel. Do not change DNS or the production Razorpay webhook until the Workers staging deployment is fully validated.
+
+Useful commands:
+
+```bash
+pnpm cf:build
+pnpm cf:preview
+pnpm cf:deploy:staging
+```
+
+Local Workers variables can be copied from `.dev.vars.example` into `.dev.vars`. Do not commit `.dev.vars`.
+
+Full setup notes, required Cloudflare secrets, webhook cautions, and the pre-cutover test checklist are in `docs/cloudflare-workers-staging.md`.
 
 ## Checks
 
