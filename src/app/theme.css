@@ -508,6 +508,20 @@ body:has(.marketing-home-light) {
   color: #1d4ed8 !important;
 }
 
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  border-color: var(--qc-border, #e2e8f0) !important;
+  background-color: #ffffff !important;
+  background-clip: content-box !important;
+  box-shadow: 0 0 0 1000px #ffffff inset !important;
+  color: #0f172a !important;
+  -webkit-text-fill-color: #0f172a !important;
+  caret-color: #0f172a !important;
+  color-scheme: light;
+  transition: background-color 9999s ease-in-out 0s;
+}
 :focus-visible {
   outline: 3px solid #8b5cf6;
   outline-offset: 3px;
