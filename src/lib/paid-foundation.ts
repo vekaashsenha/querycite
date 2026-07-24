@@ -1,4 +1,4 @@
-﻿import { normalizeWebsiteUrl } from "@/lib/url";
+import { normalizeWebsiteUrl } from "@/lib/url";
 import { normalizePaidPlanName, planLimits, type PaidPlanName, type PlanLimits } from "@/lib/plans";
 import { isSupabaseAdminConfigured, selectSupabaseRows } from "@/lib/supabase/admin";
 import type { AuditFinding, WebsiteAuditReport } from "@/lib/audit-report";
@@ -24,6 +24,10 @@ type SubscriptionRow = {
   coupon_code?: string | null;
   amount_paise?: number | null;
   currency?: string | null;
+  company_name?: string | null;
+  plan?: string | null;
+  trial_started_at?: string | null;
+  trial_ends_at?: string | null;
   access_starts_at?: string | null;
   access_ends_at?: string | null;
 };
@@ -98,7 +102,11 @@ function isOneTimeBetaRow(row: SubscriptionRow | undefined) {
 }
 
 function betaAccessEnd(row: SubscriptionRow | undefined) {
-  return row?.access_ends_at ?? row?.current_period_end ?? null;
+  return row?.access_ends_at ?? row?.trial_ends_at ?? row?.current_period_end ?? null;
+}
+
+function isFirst20ProTrialRow(row: SubscriptionRow | undefined) {
+  return row?.payment_type === "first_20_pro_trial";
 }
 
 function rowAllowsPaidAccess(row: SubscriptionRow | undefined) {
@@ -109,6 +117,11 @@ function rowAllowsPaidAccess(row: SubscriptionRow | undefined) {
     return row.paid_access === true && row.status === "active" && hasAccessStarted(row.access_starts_at ?? row.current_period_start) && isCurrentPeriodActive(end);
   }
 
+  if (isFirst20ProTrialRow(row)) {
+    const trialStatusAllowsAccess = row.status === "trialing" || row.status === "active" || row.status === "cancelled";
+    return row.paid_access === true && trialStatusAllowsAccess && hasAccessStarted(row.access_starts_at ?? row.trial_started_at ?? row.current_period_start) && isCurrentPeriodActive(end);
+  }
+
   if (row.paid_access === true && end) return isCurrentPeriodActive(end);
   if (row.paid_access === true) return true;
   if (row.status === "cancelled" && isCurrentPeriodActive(row.current_period_end)) return true;
@@ -116,6 +129,7 @@ function rowAllowsPaidAccess(row: SubscriptionRow | undefined) {
 }
 
 function statusFromRow(row: SubscriptionRow, verifiedPaidAccess: boolean) {
+  if (verifiedPaidAccess && isFirst20ProTrialRow(row) && row.status) return row.status;
   if (verifiedPaidAccess) return "active";
   if ((isOneTimeBetaRow(row) || row.coupon_code) && row.status === "active" && !isCurrentPeriodActive(betaAccessEnd(row))) return "expired";
   return row.status || "unpaid";
@@ -187,7 +201,7 @@ function contextFromRow(row: SubscriptionRow | undefined, fallbackSubscriptionId
   };
 }
 
-const subscriptionSelect = "id,user_id,email,plan_name,status,paid_access,website_url,current_period_start,current_period_end,next_billing_date,renewal_date,razorpay_subscription_id,provider_subscription_id,provider_customer_id,razorpay_order_id,payment_type,coupon_code,amount_paise,currency,access_starts_at,access_ends_at";
+const subscriptionSelect = "id,user_id,email,plan_name,status,paid_access,website_url,current_period_start,current_period_end,next_billing_date,renewal_date,razorpay_subscription_id,provider_subscription_id,provider_customer_id,razorpay_order_id,payment_type,coupon_code,amount_paise,currency,company_name,plan,trial_started_at,trial_ends_at,access_starts_at,access_ends_at";
 
 export async function getPaidAccessContext(subscriptionId?: string | null): Promise<PaidAccessContext> {
   if (!subscriptionId || !isSupabaseAdminConfigured()) return emptyContext(subscriptionId);
@@ -402,3 +416,4 @@ export function formatPaise(amount: number | null, currency = "INR") {
 export function getAdvisorResetDate(context: PaidAccessContext) {
   return context.currentPeriodEnd ?? context.renewalDate ?? new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString();
 }
+

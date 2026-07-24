@@ -2,8 +2,10 @@ import Link from "next/link";
 import { AdvisorChat } from "@/components/AdvisorChat";
 import { DashboardShell, WorkspaceHeader } from "@/components/DashboardShell";
 import { FeedbackCta } from "@/components/FeedbackCta";
+import { First20ProTrialOffer } from "@/components/First20ProTrialOffer";
 import { AppCard, EmptyState, LockedPanel, MetricCard, PrimaryLink, StatusPill } from "@/components/ui";
 import { getAdvisorResetDate, getPaidAccessContextForUser, getReportsForAuthenticatedUser } from "@/lib/paid-foundation";
+import { getProTrialStatusForUser } from "@/lib/pro-trial";
 import { requireAuthenticatedUser, syncAuthenticatedUser } from "@/lib/auth/server";
 
 function formatDate(value: string | null | undefined) {
@@ -30,6 +32,7 @@ export default async function DashboardPage() {
   await syncAuthenticatedUser(user);
   const access = await getPaidAccessContextForUser(user);
   const reports = await getReportsForAuthenticatedUser(user);
+  const proTrialStatus = await getProTrialStatusForUser(user);
   const latestReport = reports[0] ?? null;
   const hasWorkspaceAccess = access.verifiedPaidAccess || access.qaAccess;
   const advisorReport = hasWorkspaceAccess ? latestReport?.fullReportData ?? null : null;
@@ -50,6 +53,8 @@ export default async function DashboardPage() {
         <MetricCard label="Advisor credits" value={hasWorkspaceAccess ? access.limits.advisorCredits : 0} detail={hasWorkspaceAccess ? "Available per billing period" : "Unlock with full access"} tone="cyan" />
         <MetricCard label="Competitor updates" value={hasWorkspaceAccess ? access.limits.competitorChanges : "Locked"} detail="Available this period" tone="amber" />
       </section>
+
+      <First20ProTrialOffer initialStatus={proTrialStatus} userEmail={user.email} defaultCompanyName={user.name} />
 
       <FeedbackCta variant="card" />
 
@@ -172,3 +177,4 @@ export default async function DashboardPage() {
     </DashboardShell>
   );
 }
+

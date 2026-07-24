@@ -330,6 +330,11 @@ alter table public.subscriptions add column if not exists amount_paise integer;
 alter table public.subscriptions add column if not exists currency text not null default 'INR';
 alter table public.subscriptions add column if not exists access_starts_at timestamptz;
 alter table public.subscriptions add column if not exists access_ends_at timestamptz;
+alter table public.subscriptions add column if not exists company_name text;
+alter table public.subscriptions add column if not exists plan text;
+alter table public.subscriptions add column if not exists trial_started_at timestamptz;
+alter table public.subscriptions add column if not exists trial_ends_at timestamptz;
+alter table public.subscriptions add column if not exists cancelled_at timestamptz;
 
 alter table public.payments add column if not exists amount_paise integer;
 alter table public.payments add column if not exists coupon_code text;

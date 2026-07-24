@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { DashboardShell, WorkspaceHeader } from "@/components/DashboardShell";
 import { FeedbackCta } from "@/components/FeedbackCta";
+import { First20ProTrialOffer } from "@/components/First20ProTrialOffer";
 import { AppCard, EmptyState, MetricCard, StatusPill } from "@/components/ui";
 import { formatPaise, getPaidAccessContextForUser, getPaymentHistoryForUser, isPaidPaymentRecord } from "@/lib/paid-foundation";
+import { getProTrialStatusForUser } from "@/lib/pro-trial";
 import { requireAuthenticatedUser, syncAuthenticatedUser } from "@/lib/auth/server";
 
 function formatDate(value: string | null | undefined) {
@@ -15,6 +17,7 @@ export default async function BillingPage() {
   await syncAuthenticatedUser(user);
   const access = await getPaidAccessContextForUser(user);
   const payments = await getPaymentHistoryForUser(user);
+  const proTrialStatus = await getProTrialStatusForUser(user);
   const paidPayments = payments.filter(isPaidPaymentRecord);
   const badgeText = access.qaAccess ? "Admin" : access.isPaidBetaAccess ? "Beta active" : access.isExpiredBetaAccess ? "Beta expired" : access.verifiedPaidAccess ? "Paid access active" : "No active access";
   const badgeTone = access.qaAccess ? "cyan" : access.isPaidBetaAccess ? "green" : access.isExpiredBetaAccess ? "amber" : access.verifiedPaidAccess ? "green" : "amber";
@@ -26,6 +29,8 @@ export default async function BillingPage() {
       description="Verified access, payment history, and billing support."
       badge={<StatusPill tone={badgeTone}>{badgeText}</StatusPill>}
     >
+      <First20ProTrialOffer initialStatus={proTrialStatus} userEmail={user.email} defaultCompanyName={user.name} />
+
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4" id="usage">
         <MetricCard label="Current plan" value={access.rawPlanName || access.planName} detail={access.verifiedPaidAccess ? "Full report access" : "Free access"} tone="violet" />
         <MetricCard label="Payment status" value={access.status} detail={access.qaAccess ? "Admin access" : access.verifiedPaidAccess ? "Paid access active" : "Full access locked"} tone={badgeTone} />
@@ -85,3 +90,4 @@ export default async function BillingPage() {
     </DashboardShell>
   );
 }
+

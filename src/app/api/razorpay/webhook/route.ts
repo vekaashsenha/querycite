@@ -12,6 +12,7 @@ import { getAdminNotificationEmail } from "@/lib/email/resend";
 import { paymentFailedUserTemplate, paymentSuccessUserTemplate, subscriptionActiveUserTemplate, subscriptionStatusChangedUserTemplate } from "@/lib/email/templates";
 import { sendTransactionalEmail } from "@/lib/email/sendTransactionalEmail";
 import { unixSecondsToIso, verifyRazorpayWebhookSignature } from "@/lib/razorpay";
+import { FIRST_20_PRO_TRIAL_PAYMENT_TYPE } from "@/lib/pro-trial";
 import { insertSupabaseRow, isSupabaseAdminConfigured, selectSupabaseRows, updateSupabaseRows } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -93,6 +94,8 @@ function planNameFrom(subscription: JsonRecord, payment: JsonRecord) {
 }
 
 function paymentTypeFrom(subscription: JsonRecord, payment: JsonRecord) {
+  const accessType = noteText(subscription, payment, "access_type");
+  if (accessType === FIRST_20_PRO_TRIAL_PAYMENT_TYPE) return FIRST_20_PRO_TRIAL_PAYMENT_TYPE;
   const explicitPaymentType = noteText(subscription, payment, "payment_type");
   if (explicitPaymentType) return explicitPaymentType;
   if (text(payment.subscription_id) || text(subscription.id)) return "subscription_test";
@@ -251,6 +254,61 @@ async function recordCouponRedemption(payload: JsonRecord, eventName: string) {
   });
 }
 
+function trialTimestampFrom(subscription: JsonRecord, payment: JsonRecord, key: string) {
+  const noteValue = noteText(subscription, payment, key);
+  if (noteValue && !Number.isNaN(Date.parse(noteValue))) return new Date(noteValue).toISOString();
+  return null;
+}
+
+function mapFirst20ProTrialAccess(eventName: string, subscription: JsonRecord, payment: JsonRecord) {
+  const trialStartedAt = trialTimestampFrom(subscription, payment, "trial_started_at") || unixSecondsToIso(subscription.current_start) || new Date().toISOString();
+  const trialEndsAt = trialTimestampFrom(subscription, payment, "trial_ends_at") || unixSecondsToIso(subscription.charge_at) || unixSecondsToIso(subscription.current_end);
+  const periodEnd = trialEndsAt || unixSecondsToIso(subscription.current_end);
+
+  if (eventName === "subscription.authenticated") {
+    return { status: "trialing", paidAccess: Boolean(periodEnd && Date.parse(periodEnd) > Date.now()), currentPeriodStart: trialStartedAt, currentPeriodEnd: periodEnd, trialStartedAt, trialEndsAt: periodEnd };
+  }
+
+  if (["subscription.activated", "subscription.charged"].includes(eventName)) {
+    return { status: "active", paidAccess: true, currentPeriodStart: unixSecondsToIso(subscription.current_start) || trialStartedAt, currentPeriodEnd: unixSecondsToIso(subscription.current_end) || periodEnd, trialStartedAt, trialEndsAt: periodEnd };
+  }
+
+  if (eventName === "subscription.pending") {
+    return { status: "trial_pending_authorization", paidAccess: false, currentPeriodStart: trialStartedAt, currentPeriodEnd: periodEnd, trialStartedAt, trialEndsAt: periodEnd };
+  }
+
+  if (eventName === "subscription.cancelled") {
+    return { status: "cancelled", paidAccess: currentPeriodAllowsAccess(periodEnd), currentPeriodStart: trialStartedAt, currentPeriodEnd: periodEnd, trialStartedAt, trialEndsAt: periodEnd };
+  }
+
+  if (eventName === "payment.failed" || eventName === "subscription.halted") {
+    return { status: "payment_failed", paidAccess: false, currentPeriodStart: trialStartedAt, currentPeriodEnd: periodEnd, trialStartedAt, trialEndsAt: periodEnd };
+  }
+
+  return { status: "expired", paidAccess: false, currentPeriodStart: trialStartedAt, currentPeriodEnd: periodEnd, trialStartedAt, trialEndsAt: periodEnd };
+}
+
+async function syncFirst20ProTrialAllocation(payload: JsonRecord, eventName: string) {
+  if (!isSupabaseAdminConfigured()) return;
+  const subscription = entityFromPayload(payload, "subscription");
+  const payment = entityFromPayload(payload, "payment");
+  if (paymentTypeFrom(subscription, payment) !== FIRST_20_PRO_TRIAL_PAYMENT_TYPE) return;
+
+  const subscriptionId = text(subscription.id) || text(payment.subscription_id);
+  if (!subscriptionId) return;
+
+  const access = mapFirst20ProTrialAccess(eventName, subscription, payment);
+  const now = new Date().toISOString();
+  await updateSupabaseRows("pro_trial_allocations", { razorpay_subscription_id: `eq.${subscriptionId}` }, {
+    status: access.status,
+    trial_started_at: access.trialStartedAt,
+    trial_ends_at: access.trialEndsAt,
+    razorpay_customer_id: text(subscription.customer_id) || text(payment.customer_id),
+    cancel_at_period_end: eventName === "subscription.cancelled",
+    cancelled_at: eventName === "subscription.cancelled" ? now : null,
+    updated_at: now,
+  });
+}
 function mapSubscriptionAccess(eventName: string, subscription: JsonRecord) {
   const currentPeriodEnd = unixSecondsToIso(subscription.current_end);
 
@@ -360,11 +418,14 @@ async function upsertSubscription(payload: JsonRecord, eventName: string) {
     return inserted[0]?.id ?? null;
   }
 
-  const access = mapSubscriptionAccess(eventName, subscription);
+  const paymentType = paymentTypeFrom(subscription, payment);
+  const access = paymentType === FIRST_20_PRO_TRIAL_PAYMENT_TYPE ? mapFirst20ProTrialAccess(eventName, subscription, payment) : mapSubscriptionAccess(eventName, subscription);
   const row = {
     user_id: userIdFrom(subscription, payment),
     email: emailFrom(subscription, payment),
     plan_name: planNameFrom(subscription, payment),
+    plan: planNameFrom(subscription, payment),
+    company_name: noteText(subscription, payment, "company_name"),
     status: access.status,
     provider: "razorpay",
     product: "querycite",
@@ -372,16 +433,22 @@ async function upsertSubscription(payload: JsonRecord, eventName: string) {
     provider_subscription_id: subscriptionId,
     razorpay_customer_id: text(subscription.customer_id) || text(payment.customer_id),
     razorpay_subscription_id: subscriptionId,
+    payment_type: paymentType,
     paid_access: access.paidAccess,
-    current_period_start: unixSecondsToIso(subscription.current_start),
+    trial_started_at: "trialStartedAt" in access ? access.trialStartedAt : null,
+    trial_ends_at: "trialEndsAt" in access ? access.trialEndsAt : null,
+    current_period_start: "currentPeriodStart" in access ? access.currentPeriodStart : unixSecondsToIso(subscription.current_start),
     current_period_end: access.currentPeriodEnd,
-    renewal_date: unixSecondsToIso(subscription.charge_at),
-    next_billing_date: unixSecondsToIso(subscription.charge_at),
+    access_starts_at: "currentPeriodStart" in access ? access.currentPeriodStart : unixSecondsToIso(subscription.current_start),
+    access_ends_at: access.currentPeriodEnd,
+    renewal_date: unixSecondsToIso(subscription.charge_at) || access.currentPeriodEnd,
+    next_billing_date: unixSecondsToIso(subscription.charge_at) || access.currentPeriodEnd,
     cancel_at_period_end: eventName === "subscription.cancelled",
+    cancelled_at: eventName === "subscription.cancelled" ? now : null,
     failed_payment_count: eventName === "payment.failed" ? 1 : 0,
     website_url: websiteFrom(subscription, payment),
     raw_event: payload,
-    metadata: { event: eventName, notes: notesFrom(subscription) },
+    metadata: { event: eventName, notes: notesFrom(subscription), access_type: paymentType },
     updated_at: now,
   };
 
@@ -552,6 +619,7 @@ export async function POST(request: Request) {
       ? await upsertPayment(payload, eventName, subscriptionRowId)
       : null;
 
+    await syncFirst20ProTrialAllocation(payload, eventName);
     await recordCouponRedemption(payload, eventName);
     await sendWebhookEmails(payload, eventName, subscriptionRowId, paymentRowId);
 
@@ -561,3 +629,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Razorpay webhook processing failed." }, { status: 500 });
   }
 }
+

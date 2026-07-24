@@ -122,3 +122,27 @@ export async function upsertSupabaseRow<T extends Record<string, unknown>>(table
 
   return (await response.json()) as Array<T & { id?: string }>;
 }
+export async function callSupabaseRpc<T>(functionName: string, payload: Record<string, unknown>) {
+  const config = getSupabaseAdminConfig();
+  if (!config) {
+    throw new Error("Supabase admin environment variables are not configured.");
+  }
+
+  const response = await fetch(`${config.url.replace(/\/$/, "")}/rest/v1/rpc/${functionName}`, {
+    method: "POST",
+    headers: {
+      apikey: config.serviceRoleKey,
+      Authorization: `Bearer ${config.serviceRoleKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(detail || `Supabase RPC failed for ${functionName}.`);
+  }
+
+  return (await response.json()) as T;
+}
+

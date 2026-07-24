@@ -32,6 +32,13 @@ export type RazorpaySubscriptionCheckoutData = {
   };
 };
 
+export type RazorpayTrialSubscriptionCheckoutData = RazorpaySubscriptionCheckoutData & {
+  customer_id: string | null;
+  trial_started_at: string;
+  trial_ends_at: string;
+  notes: Record<string, string>;
+};
+
 export type RazorpayOrderCheckoutData = {
   key_id: string;
   order_id: string;
@@ -59,7 +66,6 @@ const oneTimeOrderPrices: Record<RazorpayPlanName, number> = {
   agency: 999900,
 };
 
-
 export function isRazorpayPlanName(value: unknown): value is RazorpayPlanName {
   return value === "starter" || value === "pro" || value === "agency";
 }
@@ -86,20 +92,119 @@ export function getRazorpayWebhookSecret() {
   return getRequiredEnv("RAZORPAY_WEBHOOK_SECRET");
 }
 
+function getRazorpayServerKeyId() {
+  const keyId = process.env.RAZORPAY_KEY_ID || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
+  if (!keyId) throw new Error("RAZORPAY_KEY_ID is not configured.");
+  if (!keyId.startsWith("rzp_test_") && !keyId.startsWith("rzp_live_")) {
+    throw new Error("Razorpay server payment configuration is required.");
+  }
+  return keyId;
+}
+
 export function getRazorpayPlanId(plan: RazorpayPlanName) {
   return getRequiredEnv(planEnvMap[plan]);
 }
 
 export function assertRazorpayServerConfigured(plan?: RazorpayPlanName) {
-  getRequiredEnv("NEXT_PUBLIC_RAZORPAY_KEY_ID");
+  getRazorpayPublicKeyId();
+  getRazorpayServerKeyId();
   getRequiredEnv("RAZORPAY_KEY_SECRET");
   if (plan) getRazorpayPlanId(plan);
 }
 
 function getBasicAuthHeader() {
-  const keyId = getRequiredEnv("NEXT_PUBLIC_RAZORPAY_KEY_ID");
+  const keyId = getRazorpayServerKeyId();
   const keySecret = getRequiredEnv("RAZORPAY_KEY_SECRET");
   return `Basic ${Buffer.from(`${keyId}:${keySecret}`).toString("base64")}`;
+}
+
+type RazorpayCustomerResponse = {
+  id?: string;
+  error?: { description?: string };
+};
+
+export async function createRazorpayCustomer(input: { name?: string; email: string; notes?: Record<string, string> }) {
+  assertRazorpayServerConfigured();
+  const response = await fetch(`${razorpayApiBase}/customers`, {
+    method: "POST",
+    headers: {
+      Authorization: getBasicAuthHeader(),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      name: input.name || input.email,
+      email: input.email,
+      notes: input.notes || { product: "querycite" },
+    }),
+  });
+
+  const data = (await response.json().catch(() => ({}))) as RazorpayCustomerResponse;
+  if (!response.ok || !data.id) {
+    throw new Error(data.error?.description || "Could not create Razorpay customer.");
+  }
+  return data.id;
+}
+
+export async function createRazorpayFutureStartSubscription(input: RazorpaySubscriptionInput & { trialStartedAt: string; trialEndsAt: string; allocationId: string }): Promise<RazorpayTrialSubscriptionCheckoutData> {
+  assertRazorpayServerConfigured("pro");
+  const planId = getRazorpayPlanId("pro");
+  const keyId = getRazorpayPublicKeyId();
+  if (!input.email || !input.userId) throw new Error("A logged-in account is required for this trial.");
+
+  const notes: Record<string, string> = {
+    product: "querycite",
+    plan_name: "pro",
+    selected_plan: "pro",
+    payment_type: "first_20_pro_trial",
+    access_type: "first_20_pro_trial",
+    trial_days: "30",
+    trial_started_at: input.trialStartedAt,
+    trial_ends_at: input.trialEndsAt,
+    allocation_id: input.allocationId,
+    website_url: input.websiteUrl || "",
+    company_name: input.companyName || "",
+    user_email: input.email,
+    email: input.email,
+    user_id: input.userId,
+    source: "querycite_first_20_trial",
+  };
+
+  const customerId = await createRazorpayCustomer({ name: input.name || input.companyName, email: input.email, notes });
+  const response = await fetch(`${razorpayApiBase}/subscriptions`, {
+    method: "POST",
+    headers: {
+      Authorization: getBasicAuthHeader(),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      plan_id: planId,
+      total_count: 12,
+      quantity: 1,
+      customer_notify: 1,
+      customer_id: customerId,
+      start_at: Math.max(Math.floor(Date.now() / 1000) + 300, Math.floor(Date.parse(input.trialEndsAt) / 1000)),
+      notes,
+    }),
+  });
+
+  const data = (await response.json().catch(() => ({}))) as { id?: string; error?: { description?: string } };
+  if (!response.ok || !data.id) {
+    throw new Error(data.error?.description || "Could not create Razorpay trial subscription.");
+  }
+
+  return {
+    key_id: keyId,
+    subscription_id: data.id,
+    customer_id: customerId,
+    plan_name: "pro",
+    trial_started_at: input.trialStartedAt,
+    trial_ends_at: input.trialEndsAt,
+    notes,
+    prefill: {
+      name: input.name,
+      email: input.email,
+    },
+  };
 }
 
 export async function createRazorpaySubscription(input: RazorpaySubscriptionInput): Promise<RazorpaySubscriptionCheckoutData> {
@@ -209,6 +314,24 @@ export async function createRazorpayOrder(input: RazorpayOrderInput): Promise<Ra
       email: input.email,
     },
   };
+}
+
+export async function cancelRazorpaySubscription(subscriptionId: string) {
+  assertRazorpayServerConfigured();
+  const response = await fetch(`${razorpayApiBase}/subscriptions/${encodeURIComponent(subscriptionId)}/cancel`, {
+    method: "POST",
+    headers: {
+      Authorization: getBasicAuthHeader(),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ cancel_at_cycle_end: 1 }),
+  });
+
+  const data = (await response.json().catch(() => ({}))) as { id?: string; status?: string; error?: { description?: string } };
+  if (!response.ok) {
+    throw new Error(data.error?.description || "Could not cancel Razorpay subscription.");
+  }
+  return data;
 }
 
 export function verifyRazorpayWebhookSignature(rawBody: string, signature: string | null) {
